@@ -43,10 +43,15 @@ Clash Verge Rev 小白稳定分享包
 - Windows 10/11：双击 install-windows.bat。
 
 注意：
-- 你的订阅里需要有 Proxies / US / Google / YouTube / Telegram 这些策略组。
+- 脚本会尽量自动识别常见订阅结构，并补齐 Proxies / US / Google / YouTube / Telegram / Exchange。
+- 如果识别不到地区节点，会降级到 Proxies 或 DIRECT，优先保证配置能启动。
 - Exchange 交易所组会由脚本自动生成，使用时请选择账号允许地区节点。
 - 安装脚本会先备份原文件，再覆盖分流规则、DNS 和基础设置。
 - 你的订阅和节点不会被修改。
+
+可以让自己的 AI Agent 帮你安装：
+请让它不要上传、复制、泄露你的订阅链接、节点、token 或账号信息；
+然后让它解压本包，按系统运行 install-macos.command 或 install-windows.bat。
 EOF
 
 perl -0pi -e 's/\r?\n/\r\n/g' "$TMP_DIR/install-windows.bat"

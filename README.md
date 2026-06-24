@@ -8,11 +8,10 @@
 
 - 想要一套稳定分流规则，但不想自己写规则的人。
 - 主要需要 AI、Google、YouTube、Telegram、交易所和国内服务合理分流的人。
-- 使用的订阅里已经有 `Proxies / US / Google / YouTube / Telegram` 这些策略组的人。
+- 已经有自己的 Clash Verge Rev 订阅，但不懂怎么优化配置的人。
 
 ## 不适合谁
 
-- 订阅策略组名字完全不同的人。
 - 想迁移别人订阅或节点的人。
 - 想用它绕过交易所地区限制的人。
 
@@ -52,30 +51,34 @@ scripts/
 Proxies / JP / HK / SG / TW / US / DIRECT
 ```
 
+如果订阅里没有这些固定组名，`Script.js` 会尽量自动识别常见节点和地区名称，并补齐缺失策略组。识别不到时会降级到 `Proxies` 或 `DIRECT`，优先保证配置能启动。
+
 ## 安装前
 
 1. 安装 Clash Verge Rev。
 2. 导入自己的订阅。
 3. 打开 Clash Verge Rev，并确认能正常代理。
 4. 完全退出 Clash Verge Rev。
-5. 确认订阅里有这些策略组：
-
-```text
-Proxies / US / Google / YouTube / Telegram
-```
 
 ## 安装方式
 
-macOS：
+最简单方法：
+
+1. 下载 Release 里的 zip。
+2. 解压 zip。
+3. 完全退出 Clash Verge Rev。
+4. 按系统双击安装脚本。
+
+macOS 双击：
 
 ```text
-双击 install/install-macos.command
+install-macos.command
 ```
 
-Windows 10/11：
+Windows 10/11 双击：
 
 ```text
-双击 install/install-windows.bat
+install-windows.bat
 ```
 
 安装脚本会先备份原文件，然后覆盖：
@@ -88,6 +91,23 @@ dns_config.yaml
 ```
 
 安装脚本不会修改订阅和节点。
+
+## 让自己的 AI Agent 帮你安装
+
+如果你不会操作，可以把下面这段发给自己的 AI Agent：
+
+```text
+请帮我安装这个 Clash Verge Rev 分享配置包。
+
+要求：
+1. 不要上传、复制、泄露我的订阅链接、节点、token 或账号信息。
+2. 先确认我已经安装 Clash Verge Rev，并且已经导入自己的订阅。
+3. 让我完全退出 Clash Verge Rev。
+4. 解压下载的 zip。
+5. macOS 运行 install-macos.command；Windows 10/11 运行 install-windows.bat。
+6. 安装完成后重新打开 Clash Verge Rev，确认能正常代理。
+7. 如果看到 US / Google / YouTube / Exchange 这些组，只需要按用途选择稳定节点。
+```
 
 ## 发布 Release 包
 
