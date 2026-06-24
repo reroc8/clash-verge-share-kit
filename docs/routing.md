@@ -4,7 +4,7 @@
 
 核心策略：
 
-- `US`：Claude、OpenAI、Gemini 等高风险 AI。
+- `US`：Claude、OpenAI、Gemini 等高风险 AI。缺少美国节点时会降级到 `Proxies`。
 - `Google`：Google 账号、登录、OAuth、支付入口和 Google 生态。
 - `YouTube`：YouTube、googlevideo、ytimg 等视频相关域名。
 - `Exchange`：OKX、Bybit、Binance、Bitget、Gate 等交易所域名。
@@ -21,3 +21,10 @@
 交易所注意：
 
 `Exchange` 只是分流隔离，不代表可绕过平台地区限制。交易所出口应按账号自身允许使用的地区选择。
+
+兼容策略：
+
+- 安装脚本不再要求订阅必须有固定策略组名。
+- `Script.js` 会自动补齐 `Proxies / US / Google / YouTube / Telegram / Exchange`。
+- 能识别地区节点时，自动生成 `HK / JP / SG / TW / US`。
+- 识别不到地区时，降级到 `Proxies` 或 `DIRECT`，优先保证配置能启动。

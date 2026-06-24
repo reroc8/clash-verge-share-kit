@@ -7,7 +7,6 @@ CLASH_DIR="$HOME/Library/Application Support/io.github.clash-verge-rev.clash-ver
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 CONFIG_DIR="$SCRIPT_DIR/../config"
 BACKUP_DIR="$CLASH_DIR/backup_$(date +%Y%m%d_%H%M%S)"
-REQUIRED_GROUPS=(Proxies US Google YouTube Telegram)
 
 if [ ! -f "$CONFIG_DIR/Merge.yaml" ]; then
     CONFIG_DIR="$SCRIPT_DIR"
@@ -31,24 +30,6 @@ fi
 
 mkdir -p "$CLASH_DIR/profiles"
 
-MISSING_GROUPS=()
-for group in "${REQUIRED_GROUPS[@]}"; do
-    if ! grep -R -- "- name: $group" "$CLASH_DIR/profiles" "$CLASH_DIR/clash-verge.yaml" >/dev/null 2>&1; then
-        MISSING_GROUPS+=("$group")
-    fi
-done
-
-if [ "${#MISSING_GROUPS[@]}" -gt 0 ]; then
-    echo "错误: 你的订阅看起来缺少这些策略组:"
-    echo "    ${MISSING_GROUPS[*]}"
-    echo ""
-    echo "这个配置适合同结构订阅。请先导入自己的订阅，并确认策略组里有:"
-    echo "    Proxies / US / Google / YouTube / Telegram"
-    echo ""
-    echo "为避免装完不可用，已停止安装。"
-    exit 1
-fi
-
 mkdir -p "$BACKUP_DIR"
 
 echo ">>> 安装前备份到: $BACKUP_DIR"
@@ -71,4 +52,4 @@ echo ""
 echo ">>> 安装完成。你的订阅和节点数据未被修改。"
 echo ">>> 原文件已备份到: $BACKUP_DIR"
 echo ">>> 请重新打开 Clash Verge Rev"
-echo ">>> 建议选择: US=稳定美国节点，Google/YouTube=常用地区节点，Exchange=账号允许地区节点"
+echo ">>> 脚本会自动补齐常见策略组。打开后可按需选择: US / Google / YouTube / Exchange"
