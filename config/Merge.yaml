@@ -1,0 +1,198 @@
+# Profile Enhancement Merge Template for Clash Verge
+
+profile:
+  store-selected: true
+
+# ── 规则集定义 ──
+rule-providers:
+  reject:
+    type: http
+    behavior: domain
+    url: "https://raw.githubusercontent.com/Loyalsoldier/clash-rules/release/reject.txt"
+    path: ./ruleset/reject.yaml
+    interval: 86400
+  proxy:
+    type: http
+    behavior: domain
+    url: "https://raw.githubusercontent.com/Loyalsoldier/clash-rules/release/proxy.txt"
+    path: ./ruleset/proxy.yaml
+    interval: 86400
+  direct:
+    type: http
+    behavior: domain
+    url: "https://raw.githubusercontent.com/Loyalsoldier/clash-rules/release/direct.txt"
+    path: ./ruleset/direct.yaml
+    interval: 86400
+  gfw:
+    type: http
+    behavior: domain
+    url: "https://raw.githubusercontent.com/Loyalsoldier/clash-rules/release/gfw.txt"
+    path: ./ruleset/gfw.yaml
+    interval: 86400
+  greatfire:
+    type: http
+    behavior: domain
+    url: "https://raw.githubusercontent.com/Loyalsoldier/clash-rules/release/greatfire.txt"
+    path: ./ruleset/greatfire.yaml
+    interval: 86400
+  tld-not-cn:
+    type: http
+    behavior: domain
+    url: "https://raw.githubusercontent.com/Loyalsoldier/clash-rules/release/tld-not-cn.txt"
+    path: ./ruleset/tld-not-cn.yaml
+    interval: 86400
+  google:
+    type: http
+    behavior: domain
+    url: "https://raw.githubusercontent.com/Loyalsoldier/clash-rules/release/google.txt"
+    path: ./ruleset/google.yaml
+    interval: 86400
+  telegramcidr:
+    type: http
+    behavior: ipcidr
+    url: "https://raw.githubusercontent.com/Loyalsoldier/clash-rules/release/telegramcidr.txt"
+    path: ./ruleset/telegramcidr.yaml
+    interval: 86400
+  apple:
+    type: http
+    behavior: domain
+    url: "https://raw.githubusercontent.com/Loyalsoldier/clash-rules/release/apple.txt"
+    path: ./ruleset/apple.yaml
+    interval: 86400
+  icloud:
+    type: http
+    behavior: domain
+    url: "https://raw.githubusercontent.com/Loyalsoldier/clash-rules/release/icloud.txt"
+    path: ./ruleset/icloud.yaml
+    interval: 86400
+  private:
+    type: http
+    behavior: domain
+    url: "https://raw.githubusercontent.com/Loyalsoldier/clash-rules/release/private.txt"
+    path: ./ruleset/private.yaml
+    interval: 86400
+  lancidr:
+    type: http
+    behavior: ipcidr
+    url: "https://raw.githubusercontent.com/Loyalsoldier/clash-rules/release/lancidr.txt"
+    path: ./ruleset/lancidr.yaml
+    interval: 86400
+  cncidr:
+    type: http
+    behavior: ipcidr
+    url: "https://raw.githubusercontent.com/Loyalsoldier/clash-rules/release/cncidr.txt"
+    path: ./ruleset/cncidr.yaml
+    interval: 86400
+  applications:
+    type: http
+    behavior: classical
+    url: "https://raw.githubusercontent.com/Loyalsoldier/clash-rules/release/applications.txt"
+    path: ./ruleset/applications.yaml
+    interval: 86400
+
+# ── 分流规则 ──
+rules:
+  # 局域网和私有地址直连
+  - RULE-SET,private,DIRECT,no-resolve
+  - RULE-SET,lancidr,DIRECT,no-resolve
+  # Google account / auth / billing stay on the stable Google group
+  - DOMAIN,accounts.google.com,Google
+  - DOMAIN,myaccount.google.com,Google
+  - DOMAIN,passwords.google.com,Google
+  - DOMAIN,families.google.com,Google
+  - DOMAIN,takeout.google.com,Google
+  - DOMAIN,payments.google.com,Google
+  - DOMAIN,pay.google.com,Google
+  - DOMAIN,wallet.google.com,Google
+  - DOMAIN-SUFFIX,oauth2.googleapis.com,Google
+  - DOMAIN-SUFFIX,oauth2.googleusercontent.com,Google
+  # High-risk / region-sensitive AI fixed to US
+  - DOMAIN-SUFFIX,claude.ai,US
+  - DOMAIN-SUFFIX,claude.com,US
+  - DOMAIN-SUFFIX,anthropic.com,US
+  - DOMAIN-SUFFIX,chatgpt.com,US
+  - DOMAIN-SUFFIX,openai.com,US
+  - DOMAIN-SUFFIX,oaistatic.com,US
+  - DOMAIN-SUFFIX,oaiusercontent.com,US
+  - DOMAIN-SUFFIX,gemini.google.com,US
+  - DOMAIN-SUFFIX,generativelanguage.googleapis.com,US
+  - DOMAIN-SUFFIX,ai.google.dev,US
+  - DOMAIN-SUFFIX,aistudio.google.com,US
+  # Other AI services are proxied but not forced to a US exit
+  - DOMAIN-SUFFIX,notebooklm.google.com,Proxies
+  - DOMAIN-SUFFIX,labs.google,Proxies
+  - DOMAIN-SUFFIX,deepmind.com,Proxies
+  - DOMAIN-SUFFIX,perplexity.ai,Proxies
+  - DOMAIN-SUFFIX,pplx.ai,Proxies
+  - DOMAIN-SUFFIX,poe.com,Proxies
+  - DOMAIN-SUFFIX,x.ai,Proxies
+  - DOMAIN-SUFFIX,grok.com,Proxies
+  - DOMAIN-SUFFIX,cursor.com,Proxies
+  - DOMAIN-SUFFIX,cursor.sh,Proxies
+  - DOMAIN-SUFFIX,cursorapi.com,Proxies
+  - DOMAIN-SUFFIX,windsurf.com,Proxies
+  - DOMAIN-SUFFIX,codeium.com,Proxies
+  - DOMAIN-SUFFIX,copilot.microsoft.com,Proxies
+  - DOMAIN-SUFFIX,githubcopilot.com,Proxies
+  - DOMAIN-SUFFIX,huggingface.co,Proxies
+  - DOMAIN-SUFFIX,hf.co,Proxies
+  - DOMAIN-SUFFIX,replicate.com,Proxies
+  - DOMAIN-SUFFIX,replicate.delivery,Proxies
+  - DOMAIN-SUFFIX,midjourney.com,Proxies
+  - DOMAIN-SUFFIX,runwayml.com,Proxies
+  - DOMAIN-SUFFIX,stability.ai,Proxies
+  - DOMAIN-SUFFIX,clipdrop.co,Proxies
+  - DOMAIN-SUFFIX,ideogram.ai,Proxies
+  - DOMAIN-SUFFIX,leonardo.ai,Proxies
+  - DOMAIN-SUFFIX,mistral.ai,Proxies
+  - DOMAIN-SUFFIX,cohere.com,Proxies
+  - DOMAIN-SUFFIX,meta.ai,Proxies
+  - DOMAIN-SUFFIX,elevenlabs.io,Proxies
+  - DOMAIN-SUFFIX,elevenlabs.com,Proxies
+  # 钉钉直连规则
+  - DOMAIN-SUFFIX,dingtalk.com,DIRECT
+  - DOMAIN-SUFFIX,dingtalkcdn.com,DIRECT
+  - DOMAIN-SUFFIX,lwurl.to,DIRECT
+  # 广告拦截
+  - RULE-SET,reject,REJECT
+  # 国内 IP 直连
+  - RULE-SET,cncidr,DIRECT,no-resolve
+  # Apple / iCloud
+  # Apple 被墙域名走代理
+  - DOMAIN,gateway.icloud.com,Proxies
+  - DOMAIN,gs.apple.com,Proxies
+  - DOMAIN-SUFFIX,developer.apple.com,Proxies
+  - DOMAIN,setup.icloud.com,Proxies
+  - RULE-SET,apple,DIRECT
+  - RULE-SET,icloud,DIRECT
+  # YouTube
+  - DOMAIN-SUFFIX,youtube.com,YouTube
+  - DOMAIN-SUFFIX,youtu.be,YouTube
+  - DOMAIN-SUFFIX,youtube-nocookie.com,YouTube
+  - DOMAIN-SUFFIX,youtubeeducation.com,YouTube
+  - DOMAIN-SUFFIX,youtubegaming.com,YouTube
+  - DOMAIN-SUFFIX,youtubekids.com,YouTube
+  - DOMAIN-SUFFIX,googlevideo.com,YouTube
+  - DOMAIN-SUFFIX,ytimg.com,YouTube
+  - DOMAIN-SUFFIX,youtubei.googleapis.com,YouTube
+  - DOMAIN-SUFFIX,yt3.ggpht.com,YouTube
+  # Google 生态
+  - RULE-SET,google,Google
+  # Telegram
+  - RULE-SET,telegramcidr,Telegram,no-resolve
+  # GFW
+  - RULE-SET,gfw,Proxies
+  - RULE-SET,greatfire,Proxies
+  # 非中国大陆顶级域名
+  - RULE-SET,tld-not-cn,Proxies
+  # 代理兜底
+  - RULE-SET,proxy,Proxies
+  # 国内域名直连（置后，确保代理规则集优先匹配）
+  - RULE-SET,direct,DIRECT
+  # 指定应用分流
+  - RULE-SET,applications,DIRECT
+  # 自定义直连
+  - DOMAIN,codebuddy.cn,DIRECT
+  - DOMAIN,copilot.tencent.com,DIRECT
+  # 最终兜底
+  - MATCH,Proxies
