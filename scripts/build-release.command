@@ -3,8 +3,13 @@ set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 DIST_DIR="$ROOT_DIR/dist"
-TIMESTAMP=$(date +%Y%m%d-%H%M%S)
-ZIP_NAME="clash-verge-share-kit-${TIMESTAMP}.zip"
+VERSION="${1:-}"
+if [ -n "$VERSION" ]; then
+    ZIP_NAME="clash-verge-share-kit-${VERSION}.zip"
+else
+    TIMESTAMP=$(date +%Y%m%d-%H%M%S)
+    ZIP_NAME="clash-verge-share-kit-${TIMESTAMP}.zip"
+fi
 TMP_DIR=$(mktemp -d)
 trap 'rm -rf "$TMP_DIR"' EXIT
 
