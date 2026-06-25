@@ -37,6 +37,23 @@ Clash Verge Rev 小白稳定分享包
 - 分享者的节点
 - 分享者的账号密码
 
+适合谁：
+- 已经有自己的订阅，但只会导入，不知道怎么调。
+- 希望 AI、Google、YouTube、Telegram、交易所和国内网站各走各的。
+- 不想研究规则、策略组、DNS、TUN，只想下载、解压、双击安装。
+
+不适合谁：
+- 还没有任何 Clash Verge Rev 订阅的人。
+- 想拿到作者节点、订阅、账号或 token 的人。
+- 想绕过交易所、AI、流媒体平台地区限制的人。
+
+它做什么：
+- Claude / ChatGPT / Gemini 尽量走适合 AI 的线路。
+- Google / Gmail / Google 登录走 Google 专用线路。
+- YouTube 走 YouTube 专用线路。
+- OKX / Bybit / Binance 走交易所专用线路。
+- 国内网站、局域网、钉钉尽量直连。
+
 使用前：
 1. 先安装 Clash Verge Rev。
 2. 导入你自己的订阅。
