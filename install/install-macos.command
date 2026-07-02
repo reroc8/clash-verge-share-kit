@@ -23,7 +23,14 @@ if [ ! -d "$CLASH_DIR" ]; then
     exit 1
 fi
 
-if pgrep -f "Clash Verge" >/dev/null 2>&1 || pgrep -f "verge-mihomo" >/dev/null 2>&1; then
+is_clash_running() {
+    pgrep -x "Clash Verge" >/dev/null 2>&1 ||
+    pgrep -x "clash-verge" >/dev/null 2>&1 ||
+    pgrep -x "verge-mihomo" >/dev/null 2>&1 ||
+    pgrep -x "mihomo" >/dev/null 2>&1
+}
+
+if is_clash_running; then
     echo "错误: 检测到 Clash Verge Rev 正在运行，请先完全退出"
     exit 1
 fi
