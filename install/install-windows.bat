@@ -9,7 +9,7 @@ set "CONFIG_DIR=%SCRIPT_DIR%..\config"
 if not exist "%CONFIG_DIR%\Merge.yaml" set "CONFIG_DIR=%SCRIPT_DIR%"
 
 if not exist "%CONFIG_DIR%\Merge.yaml" (
-    echo 错误: 未找到配置文件。请确认 config 目录存在，或使用 Release zip 根目录运行。
+    echo 错误: 未找到配置文件。请确认 config/ 目录存在，或使用 Release zip 根目录运行。
     pause
     exit /b 1
 )
@@ -21,7 +21,7 @@ if not exist "%CLASH_DIR%" (
     exit /b 1
 )
 
-for %%P in ("Clash Verge.exe" "clash-verge.exe" "verge-mihomo.exe" "mihomo.exe") do (
+for %%P in ("clash-verge.exe" "Clash Verge Rev.exe" "verge-mihomo.exe" "verge-mihomo-alpha.exe" "mihomo.exe") do (
     tasklist /FI "IMAGENAME eq %%~P" 2>nul | find /I "%%~P" >nul
     if !ERRORLEVEL! EQU 0 (
         echo 错误: 检测到 Clash Verge Rev 或内核正在运行，请先完全退出
