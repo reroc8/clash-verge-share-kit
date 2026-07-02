@@ -14,13 +14,30 @@ dns:
   fake-ip-filter:
   - '*.lan'
   - '*.local'
+  - '*.localhost'
   - '*.arpa'
   - time.*.com
   - ntp.*.com
+  - +.ntp.org
+  - time.windows.com
+  - time.apple.com
   - +.market.xiaomi.com
   - localhost.ptlogin2.qq.com
+  - localhost.sec.qq.com
+  - localhost.work.weixin.qq.com
   - '*.msftncsi.com'
   - www.msftconnecttest.com
+  - dns.msftncsi.com
+  - captive.apple.com
+  - +.stun.*.*
+  - +.stun.*.*.*
+  - +.stun.*.*.*.*
+  - stun.l.google.com
+  - +.battlenet.com.cn
+  - +.blizzard.cn
+  - _tcp.*
+  - _udp.*
+  - _services._dns-sd._udp.*
   default-nameserver:
   - 223.5.5.5
   - 119.29.29.29
