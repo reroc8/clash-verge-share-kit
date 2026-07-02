@@ -15,8 +15,10 @@ SCAN_TARGETS=(
 )
 
 if command -v rg >/dev/null 2>&1; then
+    SCAN_TOOL="rg"
     SCAN_CMD=(rg -n -i "$SENSITIVE_PATTERN")
 elif command -v grep >/dev/null 2>&1; then
+    SCAN_TOOL="grep"
     SCAN_CMD=(grep -R -n -i -E "$SENSITIVE_PATTERN")
 else
     echo "敏感信息扫描失败: 未找到 rg 或 grep"
@@ -40,4 +42,4 @@ if [ "$STATUS" -ne 1 ]; then
 fi
 
 rm -f "$TMP_FILE"
-echo "敏感信息扫描通过"
+echo "敏感信息扫描通过: 使用 $SCAN_TOOL"
