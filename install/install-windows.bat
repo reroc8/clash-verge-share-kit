@@ -5,8 +5,15 @@ setlocal enabledelayedexpansion
 set "CLASH_DIR=%APPDATA%\io.github.clash-verge-rev.clash-verge-rev"
 set "SCRIPT_DIR=%~dp0"
 set "CONFIG_DIR=%SCRIPT_DIR%..\config"
+set "PACKAGE_VERSION=dev"
+set "VERSION_FILE=%SCRIPT_DIR%VERSION.txt"
+if not exist "%VERSION_FILE%" set "VERSION_FILE=%SCRIPT_DIR%..\VERSION.txt"
+if exist "%VERSION_FILE%" set /p PACKAGE_VERSION=<"%VERSION_FILE%"
 
 if not exist "%CONFIG_DIR%\Merge.yaml" set "CONFIG_DIR=%SCRIPT_DIR%"
+
+echo 安装包版本: %PACKAGE_VERSION%
+echo 安装来源: %SCRIPT_DIR%
 
 if not exist "%CONFIG_DIR%\Merge.yaml" (
     echo 错误: 未找到配置文件。请确认 config/ 目录存在，或使用 Release zip 根目录运行。
@@ -46,9 +53,18 @@ copy /Y "%CONFIG_DIR%\Script.js"        "%CLASH_DIR%\profiles\Script.js" >nul
 copy /Y "%CONFIG_DIR%\verge.yaml"       "%CLASH_DIR%\verge.yaml" >nul
 copy /Y "%CONFIG_DIR%\dns_config.yaml"  "%CLASH_DIR%\dns_config.yaml" >nul
 
+set CLEANUP_COUNT=0
+for /f "skip=5 delims=" %%B in ('dir /b /ad /o-n "%CLASH_DIR%\backup_*" 2^>nul') do (
+    rmdir /s /q "%CLASH_DIR%\%%B" 2>nul
+    set /a CLEANUP_COUNT+=1 >nul
+)
+if !CLEANUP_COUNT! GTR 0 echo 已清理旧备份，仅保留最近 5 个 backup_* 目录
+
 echo.
 echo 安装完成。你的订阅和节点数据未被修改。
 echo 原文件已备份到: %BACKUP_DIR%
-echo 请重新打开 Clash Verge Rev
-echo 脚本会自动补齐常见策略组。打开后可按需选择: US / Google / YouTube / Exchange
+echo 配置文件已写入；重新打开 Clash Verge Rev 后即生效
+echo 安装后确认: 代理页能看到 US / Google / YouTube / Exchange
+echo 如果某类网站异常，先换对应策略组节点；如果规则集下载失败，请查看 Clash Verge Rev 日志
+echo 也可以按 README.txt 的“安装后 60 秒检查清单”逐项测试
 pause
