@@ -7,6 +7,24 @@ CLASH_DIR="$HOME/Library/Application Support/io.github.clash-verge-rev.clash-ver
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 CONFIG_DIR="$SCRIPT_DIR/../config"
 BACKUP_DIR="$CLASH_DIR/backup_$(date +%Y%m%d_%H%M%S)"
+PACKAGE_VERSION="dev"
+
+for version_file in "$SCRIPT_DIR/VERSION.txt" "$SCRIPT_DIR/../VERSION.txt"; do
+    if [ -f "$version_file" ]; then
+        PACKAGE_VERSION="$(tr -d '\r\n' < "$version_file")"
+        break
+    fi
+done
+
+cleanup_old_backups() {
+    old_backups="$(find "$CLASH_DIR" -maxdepth 1 -type d -name 'backup_*' -print 2>/dev/null | sort -r | awk 'NR > 5')"
+    if [ -n "$old_backups" ]; then
+        echo "$old_backups" | while IFS= read -r old_backup; do
+            rm -rf "$old_backup"
+        done
+        echo ">>> 已清理旧备份，仅保留最近 5 个 backup_* 目录"
+    fi
+}
 
 pause_before_close() {
     [ -t 0 ] || return 0
@@ -28,6 +46,9 @@ trap 'on_exit $?' EXIT
 if [ ! -f "$CONFIG_DIR/Merge.yaml" ]; then
     CONFIG_DIR="$SCRIPT_DIR"
 fi
+
+echo ">>> 安装包版本: $PACKAGE_VERSION"
+echo ">>> 安装来源: $SCRIPT_DIR"
 
 if [ ! -f "$CONFIG_DIR/Merge.yaml" ]; then
     echo "错误: 未找到配置文件。请确认 config/ 目录存在，或使用 Release zip 根目录运行。"
@@ -72,9 +93,13 @@ cp "$CONFIG_DIR/Script.js"        "$CLASH_DIR/profiles/Script.js"
 cp "$CONFIG_DIR/verge.yaml"       "$CLASH_DIR/verge.yaml"
 cp "$CONFIG_DIR/dns_config.yaml"  "$CLASH_DIR/dns_config.yaml"
 
+cleanup_old_backups
+
 echo ""
 echo ">>> 安装完成。你的订阅和节点数据未被修改。"
 echo ">>> 原文件已备份到: $BACKUP_DIR"
-echo ">>> 请重新打开 Clash Verge Rev"
-echo ">>> 脚本会自动补齐常见策略组。打开后可按需选择: US / Google / YouTube / Exchange"
+echo ">>> 配置文件已写入；重新打开 Clash Verge Rev 后即生效"
+echo ">>> 安装后确认: 代理页能看到 US / Google / YouTube / Exchange"
+echo ">>> 如果某类网站异常，先换对应策略组节点；如果规则集下载失败，请查看 Clash Verge Rev 日志"
+echo ">>> 也可以按 README.txt 的“安装后 60 秒检查清单”逐项测试"
 pause_before_close

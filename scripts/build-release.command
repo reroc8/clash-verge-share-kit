@@ -5,9 +5,11 @@ ROOT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 DIST_DIR="$ROOT_DIR/dist"
 VERSION="${1:-}"
 if [ -n "$VERSION" ]; then
+    PACKAGE_VERSION="$VERSION"
     ZIP_NAME="clash-verge-share-kit-${VERSION}.zip"
 else
     TIMESTAMP=$(date +%Y%m%d-%H%M%S)
+    PACKAGE_VERSION="$TIMESTAMP"
     ZIP_NAME="clash-verge-share-kit-${TIMESTAMP}.zip"
 fi
 TMP_DIR=$(mktemp -d)
@@ -23,6 +25,7 @@ cp "$ROOT_DIR/config/Merge.yaml"       "$TMP_DIR/Merge.yaml"
 cp "$ROOT_DIR/config/Script.js"        "$TMP_DIR/Script.js"
 cp "$ROOT_DIR/install/install-macos.command" "$TMP_DIR/install-macos.command"
 cp "$ROOT_DIR/install/install-windows.bat"   "$TMP_DIR/install-windows.bat"
+echo "$PACKAGE_VERSION" > "$TMP_DIR/VERSION.txt"
 
 {
     echo "Clash Verge Rev 小白稳定分享包"
