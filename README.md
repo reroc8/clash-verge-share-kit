@@ -4,6 +4,7 @@
 
 这个项目只提供配置模板和安装脚本，**不包含任何订阅、节点、账号、密码或 token**。使用者必须先导入自己的订阅。
 
+<!-- release-readme:start -->
 ## 适合谁
 
 你适合用这个包，如果你是下面这种情况：
@@ -45,6 +46,8 @@
 
 这里说的“线路”，在 Clash Verge Rev 里通常叫“策略组”。你不需要先理解这些名词，安装后能看到 `US / Google / YouTube / Exchange` 这些名字即可。
 
+<!-- release-readme:pause -->
+
 ## 包含内容
 
 ```text
@@ -82,6 +85,8 @@ Proxies / JP / HK / SG / TW / US / DIRECT
 ```
 
 如果订阅里没有这些固定组名，`Script.js` 会尽量自动识别常见节点和地区名称，并补齐缺失策略组。识别不到时会降级到 `Proxies` 或 `DIRECT`，优先保证配置能启动。
+
+<!-- release-readme:resume -->
 
 ## 安装前
 
@@ -138,6 +143,8 @@ dns_config.yaml
 6. 安装完成后重新打开 Clash Verge Rev，确认能正常代理。
 7. 如果看到 US / Google / YouTube / Exchange 这些组，只需要按用途选择稳定节点。
 ```
+
+<!-- release-readme:end -->
 
 ## 发布 Release 包
 
