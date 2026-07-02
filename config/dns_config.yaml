@@ -7,7 +7,7 @@ dns:
   enhanced-mode: fake-ip
   fake-ip-range: 198.18.0.1/16
   fake-ip-filter-mode: blacklist
-  prefer-h3: true
+  prefer-h3: false
   respect-rules: true
   use-hosts: false
   use-system-hosts: false
@@ -27,11 +27,10 @@ dns:
   nameserver:
   - https://dns.google/dns-query
   - https://cloudflare-dns.com/dns-query
-  fallback:
-  - tls://8.8.8.8:853
-  - tls://1.1.1.1:853
   nameserver-policy:
-    "geosite:cn":
+    # 不依赖 GEO 数据或外部规则集，避免新机器首次启动时因数据缺失报错。
+    # 其它国内直连域名由 respect-rules + direct-nameserver 处理。
+    "+.cn":
       - https://doh.pub/dns-query
       - https://dns.alidns.com/dns-query
   proxy-server-nameserver:
