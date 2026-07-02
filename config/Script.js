@@ -1,16 +1,41 @@
 function main(config, profileName) {
-  var groups = config["proxy-groups"] || [];
   var groupNames = {};
+  var groupNameByLower = {};
   var proxyNames = {};
 
-  for (var i = 0; i < groups.length; i++) {
-    groupNames[groups[i].name] = true;
+  function normalizeName(name) {
+    return String(name || "").toLowerCase();
   }
 
-  var proxies = config.proxies || [];
-  for (var p = 0; p < proxies.length; p++) {
-    proxyNames[proxies[p].name] = true;
+  function rememberGroupName(name) {
+    if (!name) {
+      return;
+    }
+    groupNames[name] = true;
+    var lower = normalizeName(name);
+    if (!groupNameByLower[lower]) {
+      groupNameByLower[lower] = name;
+    }
   }
+
+  var rawGroups = Array.isArray(config["proxy-groups"]) ? config["proxy-groups"] : [];
+  var groups = [];
+  for (var i = 0; i < rawGroups.length; i++) {
+    if (rawGroups[i] && rawGroups[i].name) {
+      groups.push(rawGroups[i]);
+      rememberGroupName(rawGroups[i].name);
+    }
+  }
+
+  var rawProxies = Array.isArray(config.proxies) ? config.proxies : [];
+  var proxies = [];
+  for (var p = 0; p < rawProxies.length; p++) {
+    if (rawProxies[p] && rawProxies[p].name) {
+      proxies.push(rawProxies[p]);
+      proxyNames[rawProxies[p].name] = true;
+    }
+  }
+  config.proxies = proxies;
 
   function unique(items) {
     var seen = {};
@@ -23,6 +48,13 @@ function main(config, profileName) {
       }
     }
     return result;
+  }
+
+  function findExistingGroup(name) {
+    if (groupNames[name]) {
+      return name;
+    }
+    return groupNameByLower[normalizeName(name)] || null;
   }
 
   function optionExists(name) {
@@ -39,9 +71,10 @@ function main(config, profileName) {
     return unique(result);
   }
 
-  function addGroup(name, options) {
-    if (groupNames[name]) {
-      return;
+  function ensureGroup(name, options) {
+    var existingName = findExistingGroup(name);
+    if (existingName) {
+      return existingName;
     }
     var finalOptions = filterExisting(options);
     if (finalOptions.length === 0) {
@@ -52,7 +85,8 @@ function main(config, profileName) {
       type: "select",
       proxies: finalOptions
     });
-    groupNames[name] = true;
+    rememberGroupName(name);
+    return name;
   }
 
   function optionMatches(name, patterns) {
@@ -97,7 +131,7 @@ function main(config, profileName) {
   }
   generalOptions = generalOptions.concat(originalGroups).concat(originalProxies).concat(["DIRECT"]);
 
-  addGroup("Proxies", generalOptions);
+  var PROXIES_GROUP = ensureGroup("Proxies", generalOptions);
 
   var regionPatterns = {
     HK: [/香港/i, /Hong Kong/i, /(^|[^A-Za-z])HK([^A-Za-z]|$)/i, /🇭🇰/],
@@ -105,6 +139,10 @@ function main(config, profileName) {
     SG: [/新加坡/i, /Singapore/i, /(^|[^A-Za-z])SG([^A-Za-z]|$)/i, /🇸🇬/],
     TW: [/台湾/i, /台灣/i, /臺灣/i, /Taiwan/i, /(^|[^A-Za-z])TW([^A-Za-z]|$)/i, /🇹🇼/, /🇨🇳 Taiwan/i],
     US: [/美国/i, /美國/i, /United States/i, /America/i, /(^|[^A-Za-z])US([^A-Za-z]|$)/i, /(^|[^A-Za-z])USA([^A-Za-z]|$)/i, /🇺🇸/]
+  };
+
+  var managedGroups = {
+    Proxies: PROXIES_GROUP
   };
 
   var regionOrder = ["HK", "JP", "SG", "TW", "US"];
@@ -125,64 +163,123 @@ function main(config, profileName) {
     }
 
     if (regionOptions.length > 0) {
-      addGroup(region, regionOptions);
+      managedGroups[region] = ensureGroup(region, regionOptions);
     }
   }
 
-  addGroup("US", ["Proxies", "DIRECT"]);
-  addGroup("Google", ["Proxies", "US", "HK", "JP", "SG", "TW", "DIRECT"]);
-  addGroup("YouTube", ["Proxies", "HK", "JP", "SG", "TW", "US", "DIRECT"]);
-  addGroup("Telegram", ["Proxies", "HK", "JP", "SG", "TW", "US"]);
-  addGroup("Exchange", ["Proxies", "TW", "JP", "HK", "SG", "US", "DIRECT"]);
+  if (!managedGroups.US) {
+    managedGroups.US = ensureGroup("US", [PROXIES_GROUP, "DIRECT"]);
+  }
+  managedGroups.Google = ensureGroup("Google", [PROXIES_GROUP, managedGroups.US, managedGroups.HK, managedGroups.JP, managedGroups.SG, managedGroups.TW, "DIRECT"]);
+  managedGroups.YouTube = ensureGroup("YouTube", [PROXIES_GROUP, managedGroups.HK, managedGroups.JP, managedGroups.SG, managedGroups.TW, managedGroups.US, "DIRECT"]);
+  managedGroups.Telegram = ensureGroup("Telegram", [PROXIES_GROUP, managedGroups.HK, managedGroups.JP, managedGroups.SG, managedGroups.TW, managedGroups.US]);
+  managedGroups.Exchange = ensureGroup("Exchange", [PROXIES_GROUP, managedGroups.TW, managedGroups.JP, managedGroups.HK, managedGroups.SG, managedGroups.US, "DIRECT"]);
 
   config["proxy-groups"] = groups;
 
-  var exchangeRules = [
-    "DOMAIN-SUFFIX,okx.com,Exchange",
-    "DOMAIN-SUFFIX,bybit.com,Exchange",
-    "DOMAIN-SUFFIX,bybitglobal.com,Exchange",
-    "DOMAIN-SUFFIX,bycsi.com,Exchange",
-    "DOMAIN-SUFFIX,bytick.com,Exchange",
-    "DOMAIN-SUFFIX,binance.com,Exchange",
-    "DOMAIN-SUFFIX,binance.info,Exchange",
-    "DOMAIN-SUFFIX,binance.me,Exchange",
-    "DOMAIN-SUFFIX,bitget.com,Exchange",
-    "DOMAIN-SUFFIX,gate.com,Exchange",
-    "DOMAIN-SUFFIX,gate.io,Exchange"
+  var managedTargetMap = {};
+  for (var managedName in managedGroups) {
+    if (managedGroups.hasOwnProperty(managedName)) {
+      managedTargetMap[managedName] = managedGroups[managedName];
+    }
+  }
+
+  function rewriteRuleTarget(rule) {
+    if (typeof rule !== "string" || rule.indexOf("(") !== -1) {
+      return rule;
+    }
+    var parts = rule.split(",");
+    if (parts.length < 2) {
+      return rule;
+    }
+    var targetIndex = parts[0] === "MATCH" ? 1 : 2;
+    if (parts.length > targetIndex && managedTargetMap[parts[targetIndex]]) {
+      parts[targetIndex] = managedTargetMap[parts[targetIndex]];
+      return parts.join(",");
+    }
+    return rule;
+  }
+
+  var exchangeDomains = [
+    "okx.com",
+    "bybit.com",
+    "bybitglobal.com",
+    "bycsi.com",
+    "bytick.com",
+    "binance.com",
+    "binance.info",
+    "binance.me",
+    "bitget.com",
+    "gate.com",
+    "gate.io"
   ];
 
-  var existingExchangeRules = {};
-  for (var k = 0; k < exchangeRules.length; k++) {
-    existingExchangeRules[exchangeRules[k]] = true;
+  var exchangeDomainSet = {};
+  for (var k = 0; k < exchangeDomains.length; k++) {
+    exchangeDomainSet[exchangeDomains[k]] = true;
+  }
+
+  function isManagedExchangeRule(rule) {
+    if (typeof rule !== "string" || rule.indexOf("(") !== -1) {
+      return false;
+    }
+    var parts = rule.split(",");
+    return parts[0] === "DOMAIN-SUFFIX" && exchangeDomainSet[parts[1]] === true;
+  }
+
+  var exchangeRules = [];
+  for (var er = 0; er < exchangeDomains.length; er++) {
+    exchangeRules.push("DOMAIN-SUFFIX," + exchangeDomains[er] + "," + managedGroups.Exchange);
   }
 
   var rules = config.rules || [];
   var cleanedRules = [];
   for (var r = 0; r < rules.length; r++) {
-    if (!existingExchangeRules[rules[r]]) {
-      cleanedRules.push(rules[r]);
+    var rewrittenRule = rewriteRuleTarget(rules[r]);
+    if (!isManagedExchangeRule(rewrittenRule)) {
+      cleanedRules.push(rewrittenRule);
     }
   }
 
-  var insertAt = cleanedRules.length;
-  var broadRules = [
-    "RULE-SET,gfw,",
-    "RULE-SET,greatfire,",
-    "RULE-SET,tld-not-cn,",
-    "RULE-SET,proxy,",
-    "RULE-SET,direct,",
-    "RULE-SET,applications,",
-    "MATCH,"
-  ];
+  function isBroadRule(rule) {
+    if (typeof rule !== "string") {
+      return false;
+    }
+    var upperRule = rule.toUpperCase();
+    var broadRules = [
+      "RULE-SET,GFW,",
+      "RULE-SET,GREATFIRE,",
+      "RULE-SET,TLD-NOT-CN,",
+      "RULE-SET,PROXY,",
+      "RULE-SET,DIRECT,",
+      "RULE-SET,APPLICATIONS,",
+      "RULE-SET,CNCIDR,",
+      "GEOIP,",
+      "GEOSITE,",
+      "MATCH,",
+      "FINAL,"
+    ];
 
-  for (var x = 0; x < cleanedRules.length; x++) {
     for (var y = 0; y < broadRules.length; y++) {
-      if (cleanedRules[x].indexOf(broadRules[y]) === 0) {
-        insertAt = x;
-        x = cleanedRules.length;
-        break;
+      if (upperRule.indexOf(broadRules[y]) === 0) {
+        return true;
       }
     }
+
+    return upperRule.indexOf("IP-CIDR,0.0.0.0/0,") === 0 ||
+      upperRule.indexOf("IP-CIDR6,::/0,") === 0;
+  }
+
+  var insertAt = -1;
+  for (var x = 0; x < cleanedRules.length; x++) {
+    if (isBroadRule(cleanedRules[x])) {
+      insertAt = x;
+      break;
+    }
+  }
+
+  if (insertAt === -1) {
+    insertAt = 0;
   }
 
   cleanedRules.splice.apply(cleanedRules, [insertAt, 0].concat(exchangeRules));

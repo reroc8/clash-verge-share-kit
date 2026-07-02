@@ -38,8 +38,17 @@ for %%P in ("clash-verge.exe" "Clash Verge Rev.exe" "verge-mihomo.exe" "verge-mi
 )
 
 for /f %%i in ('powershell -NoProfile -Command "Get-Date -Format yyyyMMdd_HHmmss"') do set TS=%%i
-set "BACKUP_DIR=%CLASH_DIR%\backup_%TS%"
+set BACKUP_RETRY=0
+:make_backup_dir
+set /a BACKUP_RETRY+=1 >nul
+set "BACKUP_DIR=%CLASH_DIR%\backup_%TS%_%RANDOM%%RANDOM%"
 mkdir "%BACKUP_DIR%" 2>nul
+if errorlevel 1 (
+    if !BACKUP_RETRY! LSS 10 goto make_backup_dir
+    echo 错误: 无法创建备份目录: %BACKUP_DIR%
+    pause
+    exit /b 1
+)
 
 echo 安装前备份到: %BACKUP_DIR%
 if exist "%CLASH_DIR%\profiles\Merge.yaml"   copy "%CLASH_DIR%\profiles\Merge.yaml"   "%BACKUP_DIR%\Merge.yaml" >nul
@@ -63,6 +72,9 @@ if !CLEANUP_COUNT! GTR 0 echo 已清理旧备份，仅保留最近 5 个 backup_
 echo.
 echo 安装完成。你的订阅和节点数据未被修改。
 echo 原文件已备份到: %BACKUP_DIR%
+echo 如需还原: 完全退出 Clash Verge Rev 后，把备份目录里的文件复制回对应位置
+echo   Merge.yaml / Script.js -^> %CLASH_DIR%\profiles\
+echo   verge.yaml / dns_config.yaml -^> %CLASH_DIR%\
 echo 配置文件已写入；重新打开 Clash Verge Rev 后即生效
 echo 安装后确认: 代理页能看到 US / Google / YouTube / Exchange
 echo 如果某类网站异常，先换对应策略组节点；如果规则集下载失败，请查看 Clash Verge Rev 日志
