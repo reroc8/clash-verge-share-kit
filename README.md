@@ -106,7 +106,7 @@ scripts/
 Proxies / JP / HK / SG / TW / US / DIRECT
 ```
 
-如果订阅里没有这些固定组名，`Script.js` 会尽量自动识别常见节点和地区名称，并补齐缺失策略组。识别不到时会降级到 `Proxies` 或 `DIRECT`，优先保证配置能启动。
+如果订阅里没有这些固定组名，`Script.js` 会尽量自动识别常见节点和地区名称，并补齐缺失策略组。已有 `proxies` 这类大小写不同的同名组时，会复用原组名并自动改写规则目标，避免出现两个相似策略组。识别不到时会降级到 `Proxies` 或 `DIRECT`，优先保证配置能启动。
 
 <!-- release-readme:resume -->
 
@@ -148,6 +148,18 @@ dns_config.yaml
 ```
 
 安装脚本不会修改订阅和节点。备份目录只保留最近 5 个 `backup_*`，避免长期堆积。
+
+## 如何从备份还原
+
+如果安装后想回到原来的配置：
+
+1. 完全退出 Clash Verge Rev。
+2. 打开安装脚本提示的 `backup_*` 目录。
+3. 把 `Merge.yaml`、`Script.js` 复制回 Clash Verge Rev 数据目录里的 `profiles/`。
+4. 把 `verge.yaml`、`dns_config.yaml` 复制回 Clash Verge Rev 数据目录根目录。
+5. 重新打开 Clash Verge Rev。
+
+安装脚本不会自动还原备份，避免误覆盖你安装后的新配置。
 
 ## 安装后 60 秒检查清单
 

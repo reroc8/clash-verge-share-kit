@@ -6,7 +6,7 @@ set -euo pipefail
 CLASH_DIR="$HOME/Library/Application Support/io.github.clash-verge-rev.clash-verge-rev"
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 CONFIG_DIR="$SCRIPT_DIR/../config"
-BACKUP_DIR="$CLASH_DIR/backup_$(date +%Y%m%d_%H%M%S)"
+BACKUP_STAMP="$(date +%Y%m%d_%H%M%S)"
 PACKAGE_VERSION="dev"
 
 for version_file in "$SCRIPT_DIR/VERSION.txt" "$SCRIPT_DIR/../VERSION.txt"; do
@@ -75,7 +75,7 @@ fi
 
 mkdir -p "$CLASH_DIR/profiles"
 
-mkdir -p "$BACKUP_DIR"
+BACKUP_DIR="$(mktemp -d "$CLASH_DIR/backup_${BACKUP_STAMP}_XXXXXX")"
 
 echo ">>> 安装前备份到: $BACKUP_DIR"
 
@@ -98,6 +98,9 @@ cleanup_old_backups
 echo ""
 echo ">>> 安装完成。你的订阅和节点数据未被修改。"
 echo ">>> 原文件已备份到: $BACKUP_DIR"
+echo ">>> 如需还原: 完全退出 Clash Verge Rev 后，把备份目录里的文件复制回对应位置"
+echo ">>>   Merge.yaml / Script.js -> $CLASH_DIR/profiles/"
+echo ">>>   verge.yaml / dns_config.yaml -> $CLASH_DIR/"
 echo ">>> 配置文件已写入；重新打开 Clash Verge Rev 后即生效"
 echo ">>> 安装后确认: 代理页能看到 US / Google / YouTube / Exchange"
 echo ">>> 如果某类网站异常，先换对应策略组节点；如果规则集下载失败，请查看 Clash Verge Rev 日志"
