@@ -8,6 +8,23 @@ SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 CONFIG_DIR="$SCRIPT_DIR/../config"
 BACKUP_DIR="$CLASH_DIR/backup_$(date +%Y%m%d_%H%M%S)"
 
+pause_before_close() {
+    [ -t 0 ] || return 0
+    echo ""
+    read -r -p "按回车键关闭窗口..." _ || true
+}
+
+on_exit() {
+    code="$1"
+    if [ "$code" -ne 0 ]; then
+        echo ""
+        echo "安装未完成，请检查上面的错误信息。"
+        pause_before_close
+    fi
+}
+
+trap 'on_exit $?' EXIT
+
 if [ ! -f "$CONFIG_DIR/Merge.yaml" ]; then
     CONFIG_DIR="$SCRIPT_DIR"
 fi
@@ -24,9 +41,9 @@ if [ ! -d "$CLASH_DIR" ]; then
 fi
 
 is_clash_running() {
-    pgrep -x "Clash Verge" >/dev/null 2>&1 ||
     pgrep -x "clash-verge" >/dev/null 2>&1 ||
     pgrep -x "verge-mihomo" >/dev/null 2>&1 ||
+    pgrep -x "verge-mihomo-alpha" >/dev/null 2>&1 ||
     pgrep -x "mihomo" >/dev/null 2>&1
 }
 
@@ -60,3 +77,4 @@ echo ">>> 安装完成。你的订阅和节点数据未被修改。"
 echo ">>> 原文件已备份到: $BACKUP_DIR"
 echo ">>> 请重新打开 Clash Verge Rev"
 echo ">>> 脚本会自动补齐常见策略组。打开后可按需选择: US / Google / YouTube / Exchange"
+pause_before_close
