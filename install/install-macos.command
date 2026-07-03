@@ -46,7 +46,7 @@ sync_profile_bound_files() {
         case "$file_name" in
             ""|/*|*..*|*\\*) continue ;;
         esac
-        if [ -f "$CLASH_DIR/profiles/$file_name" ]; then
+        if [ -f "$CLASH_DIR/profiles/$file_name" ] && [ ! -f "$BACKUP_DIR/$file_name" ]; then
             cp "$CLASH_DIR/profiles/$file_name" "$BACKUP_DIR/$file_name" 2>/dev/null
         fi
         if [ "$item_type" = "merge" ]; then
