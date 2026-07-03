@@ -12,6 +12,7 @@
 - 你已经有自己的机场订阅，但只会导入，不知道后面怎么调。
 - 你希望 ChatGPT、Claude、Gemini 这类 AI 尽量稳定，不想今天能用明天异常。
 - 你希望 YouTube、Google、Gmail、Telegram、交易所和国内网站各走各的，不要混在一起。
+- 你更重视网页能正常打开，不希望系统级广告拦截误伤国内网站。
 - 你不想研究“规则”“策略组”“DNS”“TUN”这些词，只想下载、解压、双击安装。
 - 你经常帮家人、朋友、新机器配置 Clash Verge Rev，希望有一个不会带自己订阅的公开包。
 - 你愿意让自己的 AI Agent 帮忙安装，但不希望它接触或泄露你的订阅、节点、token。
@@ -26,6 +27,7 @@
 - 你想拿到作者的节点、订阅、账号或 token。这个项目没有这些内容。
 - 你已经有一套很复杂的自定义配置，并且不希望 `Merge.yaml`、`Script.js`、`verge.yaml`、`dns_config.yaml` 被覆盖。
 - 你想用它绕过交易所、AI、流媒体的平台地区限制。这个包只做线路整理，不处理账号合规问题。
+- 你想靠它做系统级广告拦截或视频去广告。基础包为稳定优先，不启用 `REJECT` 广告规则。
 - 你需要公司级、团队级、审计级的统一代理方案。这个包是个人使用和小白分享场景。
 - 你完全不想备份、不想看提示、也不愿意先退出 Clash Verge Rev。安装脚本会要求先退出软件。
 
@@ -64,7 +66,9 @@ DNS 稳定解析
 
 - 订阅节点：继续使用你自己的订阅，不带分享者的节点。
 - 自动补策略组：如果订阅里缺少 `US / Google / YouTube / Telegram / Exchange`，脚本会尽量自动补齐。
+- 同步已有订阅：Clash Verge Rev 可能给每个订阅生成随机 merge/script 文件，安装脚本会一并写入，避免只改通用文件但当前订阅不生效。
 - 按业务分流：AI、Google、YouTube、Telegram、交易所、国内网站分开走，减少互相影响。
+- 不做系统级广告拦截：避免国内网站登录、风控、统计接口被误伤；去广告放到浏览器插件层。
 - DNS 稳定解析：海外域名走海外 DNS，`.cn` 和直连流量优先走国内 DNS，避免新机器依赖额外 GEO 数据。
 - 安装前自动备份：覆盖配置前先备份原文件，装错也能找回。
 
@@ -138,7 +142,7 @@ Windows 10/11 双击：
 install-windows.bat
 ```
 
-安装脚本会显示安装包版本和来源目录，然后先备份原文件，再覆盖：
+安装脚本会显示安装包版本和来源目录，然后先备份原文件，再覆盖通用配置，并同步已有订阅绑定的 merge/script 文件：
 
 ```text
 profiles/Merge.yaml
@@ -155,7 +159,7 @@ dns_config.yaml
 
 1. 完全退出 Clash Verge Rev。
 2. 打开安装脚本提示的 `backup_*` 目录。
-3. 把 `Merge.yaml`、`Script.js` 复制回 Clash Verge Rev 数据目录里的 `profiles/`。
+3. 把 `Merge.yaml`、`Script.js`，以及备份目录里其它随机命名的 `.yaml` / `.js` 复制回 Clash Verge Rev 数据目录里的 `profiles/`。
 4. 把 `verge.yaml`、`dns_config.yaml` 复制回 Clash Verge Rev 数据目录根目录。
 5. 重新打开 Clash Verge Rev。
 

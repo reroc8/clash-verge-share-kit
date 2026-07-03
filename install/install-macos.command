@@ -26,6 +26,37 @@ cleanup_old_backups() {
     fi
 }
 
+
+sync_profile_bound_files() {
+    profiles_yaml="$CLASH_DIR/profiles.yaml"
+    [ -f "$profiles_yaml" ] || return 0
+
+    awk '
+        /^- uid:/ { item_type = "" }
+        /^[[:space:]]*type:[[:space:]]*(merge|script)[[:space:]]*$/ { item_type = $2 }
+        /^[[:space:]]*file:[[:space:]]*/ {
+            file = $2
+            gsub(/"/, "", file)
+            gsub(/'"'"'/, "", file)
+            if (item_type == "merge" || item_type == "script") {
+                print item_type " " file
+            }
+        }
+    ' "$profiles_yaml" | while IFS=' ' read -r item_type file_name; do
+        case "$file_name" in
+            ""|/*|*..*|*\\*) continue ;;
+        esac
+        if [ -f "$CLASH_DIR/profiles/$file_name" ]; then
+            cp "$CLASH_DIR/profiles/$file_name" "$BACKUP_DIR/$file_name" 2>/dev/null
+        fi
+        if [ "$item_type" = "merge" ]; then
+            cp "$CONFIG_DIR/Merge.yaml" "$CLASH_DIR/profiles/$file_name"
+        elif [ "$item_type" = "script" ]; then
+            cp "$CONFIG_DIR/Script.js" "$CLASH_DIR/profiles/$file_name"
+        fi
+    done
+}
+
 pause_before_close() {
     [ -t 0 ] || return 0
     echo ""
@@ -90,6 +121,7 @@ done
 echo ">>> 正在安装..."
 cp "$CONFIG_DIR/Merge.yaml"       "$CLASH_DIR/profiles/Merge.yaml"
 cp "$CONFIG_DIR/Script.js"        "$CLASH_DIR/profiles/Script.js"
+sync_profile_bound_files
 cp "$CONFIG_DIR/verge.yaml"       "$CLASH_DIR/verge.yaml"
 cp "$CONFIG_DIR/dns_config.yaml"  "$CLASH_DIR/dns_config.yaml"
 
@@ -99,9 +131,10 @@ echo ""
 echo ">>> 安装完成。你的订阅和节点数据未被修改。"
 echo ">>> 原文件已备份到: $BACKUP_DIR"
 echo ">>> 如需还原: 完全退出 Clash Verge Rev 后，把备份目录里的文件复制回对应位置"
-echo ">>>   Merge.yaml / Script.js -> $CLASH_DIR/profiles/"
+echo ">>>   Merge.yaml / Script.js / 其它随机 .yaml .js -> $CLASH_DIR/profiles/"
 echo ">>>   verge.yaml / dns_config.yaml -> $CLASH_DIR/"
-echo ">>> 配置文件已写入；重新打开 Clash Verge Rev 后即生效"
+echo ">>> 配置文件已写入，并已同步已有订阅绑定的 merge/script 文件"
+echo ">>> 重新打开 Clash Verge Rev 后即生效"
 echo ">>> 安装后确认: 代理页能看到 US / Google / YouTube / Exchange"
 echo ">>> 如果某类网站异常，先换对应策略组节点；如果规则集下载失败，请查看 Clash Verge Rev 日志"
 echo ">>> 也可以按 README.txt 的“安装后 60 秒检查清单”逐项测试"
