@@ -8,7 +8,7 @@ set "CONFIG_DIR=%SCRIPT_DIR%..\config"
 set "PACKAGE_VERSION=dev"
 set "VERSION_FILE=%SCRIPT_DIR%VERSION.txt"
 if not exist "%VERSION_FILE%" set "VERSION_FILE=%SCRIPT_DIR%..\VERSION.txt"
-if exist "%VERSION_FILE%" set /p PACKAGE_VERSION=<"%VERSION_FILE%"
+if exist "%VERSION_FILE%" for /f "usebackq delims=" %%V in ("%VERSION_FILE%") do set "PACKAGE_VERSION=%%V"
 
 if not exist "%CONFIG_DIR%\Merge.yaml" set "CONFIG_DIR=%SCRIPT_DIR%"
 
