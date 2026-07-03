@@ -59,6 +59,12 @@ if exist "%CLASH_DIR%\dns_config.yaml"       copy "%CLASH_DIR%\dns_config.yaml" 
 echo 正在安装...
 copy /Y "%CONFIG_DIR%\Merge.yaml"       "%CLASH_DIR%\profiles\Merge.yaml" >nul
 copy /Y "%CONFIG_DIR%\Script.js"        "%CLASH_DIR%\profiles\Script.js" >nul
+powershell -NoProfile -ExecutionPolicy Bypass -Command "$clash=$env:CLASH_DIR; $config=$env:CONFIG_DIR; $backup=$env:BACKUP_DIR; $profiles=Join-Path $clash 'profiles'; $profilesYaml=Join-Path $clash 'profiles.yaml'; if (Test-Path $profilesYaml) { $itemType=$null; Get-Content $profilesYaml | ForEach-Object { if ($_ -match '^- uid:') { $itemType=$null }; if ($_ -match '^\s*type:\s*(merge|script)\s*$') { $itemType=$Matches[1] }; if ($_ -match '^\s*file:\s*([^\s]+)\s*$' -and ($itemType -eq 'merge' -or $itemType -eq 'script')) { $file=$Matches[1].Trim('"'); if ($file -notmatch '[\\/:]' -and $file -notmatch '\.\.') { $dst=Join-Path $profiles $file; if (Test-Path $dst) { Copy-Item -Force $dst (Join-Path $backup $file) }; if ($itemType -eq 'merge') { Copy-Item -Force (Join-Path $config 'Merge.yaml') $dst } else { Copy-Item -Force (Join-Path $config 'Script.js') $dst } } } } }"
+if errorlevel 1 (
+    echo 错误: 同步已有订阅绑定的 merge/script 文件失败
+    pause
+    exit /b 1
+)
 copy /Y "%CONFIG_DIR%\verge.yaml"       "%CLASH_DIR%\verge.yaml" >nul
 copy /Y "%CONFIG_DIR%\dns_config.yaml"  "%CLASH_DIR%\dns_config.yaml" >nul
 
@@ -73,9 +79,10 @@ echo.
 echo 安装完成。你的订阅和节点数据未被修改。
 echo 原文件已备份到: %BACKUP_DIR%
 echo 如需还原: 完全退出 Clash Verge Rev 后，把备份目录里的文件复制回对应位置
-echo   Merge.yaml / Script.js -^> %CLASH_DIR%\profiles\
+echo   Merge.yaml / Script.js / 其它随机 .yaml .js -^> %CLASH_DIR%\profiles\
 echo   verge.yaml / dns_config.yaml -^> %CLASH_DIR%\
-echo 配置文件已写入；重新打开 Clash Verge Rev 后即生效
+echo 配置文件已写入，并已同步已有订阅绑定的 merge/script 文件
+echo 重新打开 Clash Verge Rev 后即生效
 echo 安装后确认: 代理页能看到 US / Google / YouTube / Exchange
 echo 如果某类网站异常，先换对应策略组节点；如果规则集下载失败，请查看 Clash Verge Rev 日志
 echo 也可以按 README.txt 的“安装后 60 秒检查清单”逐项测试

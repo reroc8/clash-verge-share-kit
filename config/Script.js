@@ -18,6 +18,11 @@ function main(config, profileName) {
     }
   }
 
+  var ruleProviders = config["rule-providers"];
+  if (ruleProviders && ruleProviders.reject) {
+    delete ruleProviders.reject;
+  }
+
   var rawGroups = Array.isArray(config["proxy-groups"]) ? config["proxy-groups"] : [];
   var groups = [];
   for (var i = 0; i < rawGroups.length; i++) {
@@ -227,6 +232,21 @@ function main(config, profileName) {
     return parts[0] === "DOMAIN-SUFFIX" && exchangeDomainSet[parts[1]] === true;
   }
 
+  function isRejectRule(rule) {
+    if (typeof rule !== "string" || rule.indexOf("(") !== -1) {
+      return false;
+    }
+    var parts = rule.split(",");
+    if (parts.length < 2) {
+      return false;
+    }
+    var type = String(parts[0] || "").toUpperCase();
+    var targetIndex = type === "MATCH" ? 1 : 2;
+    var providerName = String(parts[1] || "").toLowerCase();
+    var target = String(parts[targetIndex] || "").toUpperCase();
+    return target === "REJECT" || (type === "RULE-SET" && providerName === "reject");
+  }
+
   var exchangeRules = [];
   for (var er = 0; er < exchangeDomains.length; er++) {
     exchangeRules.push("DOMAIN-SUFFIX," + exchangeDomains[er] + "," + managedGroups.Exchange);
@@ -236,7 +256,7 @@ function main(config, profileName) {
   var cleanedRules = [];
   for (var r = 0; r < rules.length; r++) {
     var rewrittenRule = rewriteRuleTarget(rules[r]);
-    if (!isManagedExchangeRule(rewrittenRule)) {
+    if (!isManagedExchangeRule(rewrittenRule) && !isRejectRule(rewrittenRule)) {
       cleanedRules.push(rewrittenRule);
     }
   }
