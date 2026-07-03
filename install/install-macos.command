@@ -135,7 +135,7 @@ echo ">>>   Merge.yaml / Script.js / 其它随机 .yaml .js -> $CLASH_DIR/profil
 echo ">>>   verge.yaml / dns_config.yaml -> $CLASH_DIR/"
 echo ">>> 配置文件已写入，并已同步已有订阅绑定的 merge/script 文件"
 echo ">>> 重新打开 Clash Verge Rev 后即生效"
-echo ">>> 安装后确认: 代理页能看到 US / Google / YouTube / Exchange"
+echo ">>> 安装后确认: 代理页能看到 Claude / AI / US / Google / YouTube / Exchange"
 echo ">>> 如果某类网站异常，先换对应策略组节点；如果规则集下载失败，请查看 Clash Verge Rev 日志"
 echo ">>> 也可以按 README.txt 的“安装后 60 秒检查清单”逐项测试"
 pause_before_close
