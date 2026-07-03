@@ -63,7 +63,7 @@ function main(config, profileName) {
   }
 
   function optionExists(name) {
-    return name === "DIRECT" || groupNames[name] || proxyNames[name];
+    return name === "DIRECT" || name === "REJECT" || groupNames[name] || proxyNames[name];
   }
 
   function filterExisting(items) {
@@ -107,9 +107,12 @@ function main(config, profileName) {
     return name;
   }
 
-  function ensureManagedGroup(name, options) {
+  function ensureManagedGroup(name, options, fallbackOptions) {
     var existingGroup = findGroup(name);
     var finalOptions = filterExisting(options);
+    if (finalOptions.length === 0) {
+      finalOptions = filterExisting(fallbackOptions || ["DIRECT"]);
+    }
     if (finalOptions.length === 0) {
       finalOptions = ["DIRECT"];
     }
@@ -206,15 +209,15 @@ function main(config, profileName) {
   }
   managedGroups.Claude = ensureManagedGroup("Claude", [
     detectedRegions.US ? managedGroups.US : null
-  ]);
+  ], ["REJECT"]);
   managedGroups.AI = ensureManagedGroup("AI", [
     detectedRegions.US ? managedGroups.US : null,
     detectedRegions.TW ? managedGroups.TW : null
-  ]);
+  ], ["REJECT"]);
   managedGroups.Google = ensureGroup("Google", [PROXIES_GROUP, managedGroups.US, managedGroups.HK, managedGroups.JP, managedGroups.SG, managedGroups.TW, "DIRECT"]);
   managedGroups.YouTube = ensureGroup("YouTube", [PROXIES_GROUP, managedGroups.HK, managedGroups.JP, managedGroups.SG, managedGroups.TW, managedGroups.US, "DIRECT"]);
   managedGroups.Telegram = ensureGroup("Telegram", [PROXIES_GROUP, managedGroups.HK, managedGroups.JP, managedGroups.SG, managedGroups.TW, managedGroups.US]);
-  managedGroups.Exchange = ensureManagedGroup("Exchange", [managedGroups.TW, managedGroups.SG]);
+  managedGroups.Exchange = ensureManagedGroup("Exchange", [managedGroups.TW, managedGroups.SG], ["REJECT"]);
 
   config["proxy-groups"] = groups;
 

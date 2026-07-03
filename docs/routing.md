@@ -25,7 +25,7 @@
 
 交易所注意：
 
-`Claude`、`AI` 和 `Exchange` 都只是分流隔离，不代表可绕过平台地区限制。`Claude` 只保留 `US`，`AI` 只保留 `US / TW`，`Exchange` 只保留 `TW / SG`，都不混入其它地区、DIRECT 或 Proxies。未知站点最终兜底为 `DIRECT`，避免国内小站误走代理。
+`Claude`、`AI` 和 `Exchange` 都只是分流隔离，不代表可绕过平台地区限制。`Claude` 只保留 `US`，`AI` 只保留 `US / TW`，`Exchange` 只保留 `TW / SG`，都不混入其它地区、DIRECT 或 Proxies；没有对应地区节点时使用 `REJECT`，避免直连泄露或误用其它地区。未知站点最终兜底为 `DIRECT`，避免国内小站误走代理。
 
 兼容策略：
 

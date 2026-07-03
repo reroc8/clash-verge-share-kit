@@ -114,7 +114,7 @@ AI: US / TW
 Exchange: TW / SG
 ```
 
-`Claude` 只保留美国地区组。`AI` 只保留美国和台湾地区组，不混用港区、日区、新加坡或普通代理兜底。OpenAI、Gemini 这类高风险服务建议优先选 US。
+`Claude` 只保留美国地区组。`AI` 只保留美国和台湾地区组，不混用港区、日区、新加坡或普通代理兜底。没有对应地区节点时会显示 `REJECT`，表示不要登录或使用该类服务。OpenAI、Gemini 这类高风险服务建议优先选 US。
 
 `Exchange` 只保留台湾和新加坡地区组，不混用美区、港区、日区或普通代理兜底。
 
@@ -181,8 +181,8 @@ dns_config.yaml
 |---|---|---|---|
 | Google | `google.com` 或 Gmail | 能打开、能搜索或进入邮箱 | `Google` 组换一个稳定节点 |
 | YouTube | `youtube.com` | 首页图片能加载，视频能播放 | `YouTube` 组换节点 |
-| Claude | `claude.ai` | 能打开并正常对话 | `Claude` 组只选 US，优先低风控美国节点 |
-| 交易所 | OKX / Bybit / Binance | 页面能打开，登录前确认账号允许地区 | `Exchange` 只选 TW / SG；没有对应节点就先别登录 |
+| Claude | `claude.ai` | 能打开并正常对话 | `Claude` 组只选 US；如果只有 REJECT，先补美国节点 |
+| 交易所 | OKX / Bybit / Binance | 页面能打开，登录前确认账号允许地区 | `Exchange` 只选 TW / SG；如果只有 REJECT，就先别登录 |
 | 国内网站 | 百度、淘宝、钉钉、腾讯系网站 | 打开速度正常，不绕远 | 确认当前模式不是全局代理 |
 
 如果只有某一类网站异常，先换对应策略组里的节点；如果国内小站打开异常，先看是否被误判为代理流量；如果全部异常，再检查订阅是否过期、系统代理/TUN 是否打开。
