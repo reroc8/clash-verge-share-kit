@@ -42,7 +42,7 @@
 | Claude | Claude 专用美区线路 |
 | ChatGPT / Gemini / Copilot / Cursor 等 | AI 专用线路（US / TW） |
 | Google / Gmail / Google 登录 | Google 专用线路 |
-| YouTube | YouTube 专用线路 |
+| YouTube / YouTube Kids / 嵌入播放器 | YouTube 专用线路 |
 | OKX / Bybit / Binance / Bitget / Gate / KuCoin / MEXC 等 | 交易所专用线路 |
 | 国内网站、局域网、钉钉 | 直连 |
 | 明确海外网站 | 普通代理线路 |
@@ -87,6 +87,7 @@ config/
 install/
   install-macos.command
   install-windows.bat
+  sync-profile-bound-files.ps1
 
 scripts/
   check-sensitive.sh
@@ -100,7 +101,7 @@ scripts/
 | Claude | `Claude` |
 | 其它 AI 服务 | `AI` |
 | Google 账号和 Google 生态 | `Google` |
-| YouTube | `YouTube` |
+| YouTube / YouTube Kids / 嵌入播放器 | `YouTube` |
 | Telegram | `Telegram` |
 | 交易所 | `Exchange` |
 | 国内和局域网 | `DIRECT` |

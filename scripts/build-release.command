@@ -25,6 +25,20 @@ if [ -n "$VERSION" ]; then
         echo "请先确认要发布的版本，只保留一个版本来源"
         exit 1
     fi
+    CHANGELOG_FILE="$ROOT_DIR/CHANGELOG.md"
+    if [ ! -f "$CHANGELOG_FILE" ]; then
+        echo "错误: 缺少 CHANGELOG.md"
+        exit 1
+    fi
+    if ! awk -v version="$VERSION" '
+        $0 == "## " version { found = 1; next }
+        found && /^## / { exit }
+        found && /^- / { item = 1 }
+        END { exit !(found && item) }
+    ' "$CHANGELOG_FILE"; then
+        echo "错误: CHANGELOG.md 缺少 $VERSION 标题，或该版本下没有变更条目"
+        exit 1
+    fi
     ZIP_NAME="clash-verge-share-kit-${VERSION}.zip"
 else
     TIMESTAMP=$(date +%Y%m%d-%H%M%S)
@@ -44,6 +58,7 @@ cp "$ROOT_DIR/config/Merge.yaml"       "$TMP_DIR/Merge.yaml"
 cp "$ROOT_DIR/config/Script.js"        "$TMP_DIR/Script.js"
 cp "$ROOT_DIR/install/install-macos.command" "$TMP_DIR/install-macos.command"
 cp "$ROOT_DIR/install/install-windows.bat"   "$TMP_DIR/install-windows.bat"
+cp "$ROOT_DIR/install/sync-profile-bound-files.ps1" "$TMP_DIR/sync-profile-bound-files.ps1"
 echo "$PACKAGE_VERSION" > "$TMP_DIR/VERSION.txt"
 
 {
@@ -57,6 +72,10 @@ echo "$PACKAGE_VERSION" > "$TMP_DIR/VERSION.txt"
         emit { print }
     ' "$ROOT_DIR/README.md"
 } > "$TMP_DIR/README.txt"
+
+if [ -f "$ROOT_DIR/CHANGELOG.md" ]; then
+    cp "$ROOT_DIR/CHANGELOG.md" "$TMP_DIR/CHANGELOG.txt"
+fi
 
 if ! grep -q "安装方式" "$TMP_DIR/README.txt"; then
     echo "错误: README.md 缺少 Release 使用说明区段"

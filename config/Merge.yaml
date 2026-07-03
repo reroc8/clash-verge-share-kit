@@ -165,6 +165,9 @@ rules:
   - DOMAIN-SUFFIX,dingtalk.com,DIRECT
   - DOMAIN-SUFFIX,dingtalkcdn.com,DIRECT
   - DOMAIN-SUFFIX,lwurl.to,DIRECT
+  # 自定义直连：放在宽泛代理规则前，避免被后续规则集抢先命中
+  - DOMAIN,codebuddy.cn,DIRECT
+  - DOMAIN,copilot.tencent.com,DIRECT
   # 国内 IP 直连
   - RULE-SET,cncidr,DIRECT,no-resolve
   # Apple / iCloud
@@ -201,8 +204,5 @@ rules:
   - RULE-SET,direct,DIRECT
   # 指定应用分流
   - RULE-SET,applications,DIRECT
-  # 自定义直连
-  - DOMAIN,codebuddy.cn,DIRECT
-  - DOMAIN,copilot.tencent.com,DIRECT
   # 最终兜底：未知站点直连，避免国内 .com 被误送代理导致 502
   - MATCH,DIRECT

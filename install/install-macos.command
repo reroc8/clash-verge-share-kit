@@ -8,6 +8,10 @@ SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 CONFIG_DIR="$SCRIPT_DIR/../config"
 BACKUP_STAMP="$(date +%Y%m%d_%H%M%S)"
 PACKAGE_VERSION="dev"
+BACKUP_DIR=""
+CREATED_FILES_LIST=""
+INSTALL_STARTED=0
+INSTALL_COMPLETED=0
 
 for version_file in "$SCRIPT_DIR/VERSION.txt" "$SCRIPT_DIR/../VERSION.txt"; do
     if [ -f "$version_file" ]; then
@@ -26,6 +30,81 @@ cleanup_old_backups() {
     fi
 }
 
+pause_before_close() {
+    [ -t 0 ] || return 0
+    echo ""
+    read -r -p "按回车键关闭窗口..." _ || true
+}
+
+backup_existing_file() {
+    src="$1"
+    backup_name="$2"
+
+    if [ -f "$src" ]; then
+        if [ ! -f "$BACKUP_DIR/$backup_name" ]; then
+            cp "$src" "$BACKUP_DIR/$backup_name"
+        fi
+    elif [ -n "${CREATED_FILES_LIST:-}" ]; then
+        printf '%s\n' "$src" >> "$CREATED_FILES_LIST"
+    fi
+}
+
+restore_from_backup() {
+    [ "$INSTALL_STARTED" = "1" ] || return 0
+    [ "$INSTALL_COMPLETED" = "0" ] || return 0
+    [ -n "${BACKUP_DIR:-}" ] || return 0
+    [ -d "$BACKUP_DIR" ] || return 0
+
+    echo ">>> 检测到安装未完成，正在尝试恢复安装前配置..."
+
+    if [ -f "${CREATED_FILES_LIST:-}" ]; then
+        while IFS= read -r created_file; do
+            [ -n "$created_file" ] || continue
+            if [ -f "$created_file" ]; then
+                if rm -f "$created_file"; then
+                    :
+                else
+                    echo "警告: 无法移除安装中新建的文件: $created_file"
+                fi
+            fi
+        done < "$CREATED_FILES_LIST"
+    fi
+
+    restored_count=0
+    for backup_file in "$BACKUP_DIR"/*; do
+        [ -f "$backup_file" ] || continue
+        file_name="$(basename "$backup_file")"
+        case "$file_name" in
+            .created-files)
+                continue
+                ;;
+            verge.yaml|dns_config.yaml)
+                restore_path="$CLASH_DIR/$file_name"
+                ;;
+            *)
+                restore_path="$CLASH_DIR/profiles/$file_name"
+                ;;
+        esac
+
+        if cp "$backup_file" "$restore_path"; then
+            restored_count=$((restored_count + 1))
+        else
+            echo "警告: 恢复失败: $restore_path"
+        fi
+    done
+
+    echo ">>> 已尝试恢复 $restored_count 个备份文件"
+}
+
+on_exit() {
+    code="$1"
+    if [ "$code" -ne 0 ]; then
+        echo ""
+        restore_from_backup
+        echo "安装未完成，请检查上面的错误信息。"
+        pause_before_close
+    fi
+}
 
 sync_profile_bound_files() {
     profiles_yaml="$CLASH_DIR/profiles.yaml"
@@ -46,30 +125,13 @@ sync_profile_bound_files() {
         case "$file_name" in
             ""|/*|*..*|*\\*) continue ;;
         esac
-        if [ -f "$CLASH_DIR/profiles/$file_name" ] && [ ! -f "$BACKUP_DIR/$file_name" ]; then
-            cp "$CLASH_DIR/profiles/$file_name" "$BACKUP_DIR/$file_name" 2>/dev/null
-        fi
+        backup_existing_file "$CLASH_DIR/profiles/$file_name" "$file_name"
         if [ "$item_type" = "merge" ]; then
             cp "$CONFIG_DIR/Merge.yaml" "$CLASH_DIR/profiles/$file_name"
         elif [ "$item_type" = "script" ]; then
             cp "$CONFIG_DIR/Script.js" "$CLASH_DIR/profiles/$file_name"
         fi
     done
-}
-
-pause_before_close() {
-    [ -t 0 ] || return 0
-    echo ""
-    read -r -p "按回车键关闭窗口..." _ || true
-}
-
-on_exit() {
-    code="$1"
-    if [ "$code" -ne 0 ]; then
-        echo ""
-        echo "安装未完成，请检查上面的错误信息。"
-        pause_before_close
-    fi
 }
 
 trap 'on_exit $?' EXIT
@@ -107,23 +169,27 @@ fi
 mkdir -p "$CLASH_DIR/profiles"
 
 BACKUP_DIR="$(mktemp -d "$CLASH_DIR/backup_${BACKUP_STAMP}_XXXXXX")"
+CREATED_FILES_LIST="$BACKUP_DIR/.created-files"
+: > "$CREATED_FILES_LIST"
 
 echo ">>> 安装前备份到: $BACKUP_DIR"
 
 for file in "Merge.yaml" "Script.js" "verge.yaml" "dns_config.yaml"; do
     if [ "$file" = "Merge.yaml" ] || [ "$file" = "Script.js" ]; then
-        [ -f "$CLASH_DIR/profiles/$file" ] && cp "$CLASH_DIR/profiles/$file" "$BACKUP_DIR/$file" 2>/dev/null
+        backup_existing_file "$CLASH_DIR/profiles/$file" "$file"
     else
-        [ -f "$CLASH_DIR/$file" ] && cp "$CLASH_DIR/$file" "$BACKUP_DIR/$file" 2>/dev/null
+        backup_existing_file "$CLASH_DIR/$file" "$file"
     fi
 done
 
 echo ">>> 正在安装..."
+INSTALL_STARTED=1
 cp "$CONFIG_DIR/Merge.yaml"       "$CLASH_DIR/profiles/Merge.yaml"
 cp "$CONFIG_DIR/Script.js"        "$CLASH_DIR/profiles/Script.js"
 sync_profile_bound_files
 cp "$CONFIG_DIR/verge.yaml"       "$CLASH_DIR/verge.yaml"
 cp "$CONFIG_DIR/dns_config.yaml"  "$CLASH_DIR/dns_config.yaml"
+INSTALL_COMPLETED=1
 
 cleanup_old_backups
 

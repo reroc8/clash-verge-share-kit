@@ -7,7 +7,7 @@
 - `Claude`：Claude / Anthropic 独立组，只保留 `US`。
 - `AI`：OpenAI、Gemini、Copilot、Cursor、Perplexity 等 AI 服务，只保留 `US / TW` 两个地区组；默认优先 US。
 - `Google`：Google 账号、登录、OAuth、支付入口和 Google 生态。
-- `YouTube`：YouTube、googlevideo、ytimg 等视频相关域名。
+- `YouTube`：`youtube.com`、`youtu.be`、`youtube-nocookie.com`、`youtubeeducation.com`、`youtubegaming.com`、`youtubekids.com`、`googlevideo.com`、`ytimg.com`、`youtubei.googleapis.com`、`yt3.ggpht.com` 等视频、图片、嵌入播放器和儿童/教育子产品域名。
 - `Exchange`：OKX、Bybit、Binance、Bitget、Gate、KuCoin、MEXC、Crypto.com、Coinbase、Kraken、HTX、BingX、BitMart、Bitfinex、Bitstamp、Upbit 等交易所域名。
 - `DIRECT`：局域网、国内 IP、钉钉、常规 Apple/iCloud。
 - `Proxies`：明确海外规则命中的普通代理；如果订阅里已有 `proxies` / `PROXIES` 等大小写变体，会复用原组名并自动改写规则目标，避免出现两个相似组。
@@ -22,6 +22,12 @@
 - 当前 DNS 不使用 `geosite:cn`、`fallback`、`fallback-filter` 或 GeoIP/MMDB 兜底，避免新机器首次启动时下载 GEO 数据失败。
 - 国内 DNS 只通过 `nameserver-policy` 的 `+.cn` 和 `direct-nameserver` 兜底处理；海外域名默认走 Google / Cloudflare DoH。
 - `prefer-h3` 保持关闭，避免和 `respect-rules` 组合造成 DNS 行为不稳定。
+
+最终兜底：
+
+最终规则使用 `MATCH,DIRECT`，不是 `MATCH,Proxies`。原因是国内很多小站是 `.com`，不一定会命中 `direct` 规则集；如果未知域名默认走代理，节点或上游可能返回 502。当前设计把 AI、Google、YouTube、Telegram、交易所、GFW、非 CN TLD、Loyalsoldier proxy 等明确海外流量提前代理，剩余未知流量默认直连，优先保证国内网站和小白用户日常访问稳定。
+
+这个取舍的副作用是：少数没被规则集覆盖的海外冷门网站可能直连失败。遇到这类网站时，应补明确域名规则，而不是把全局兜底改回 `Proxies`。
 
 交易所注意：
 
