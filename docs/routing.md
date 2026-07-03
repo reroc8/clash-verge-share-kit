@@ -4,12 +4,13 @@
 
 核心策略：
 
-- `US`：Claude、OpenAI、Gemini 等高风险 AI。缺少美国节点时会降级到 `Proxies`。
+- `Claude`：Claude / Anthropic 独立组，只保留 `US`。
+- `AI`：OpenAI、Gemini、Copilot、Cursor、Perplexity 等 AI 服务，只保留 `US / TW` 两个地区组；默认优先 US。
 - `Google`：Google 账号、登录、OAuth、支付入口和 Google 生态。
 - `YouTube`：YouTube、googlevideo、ytimg 等视频相关域名。
-- `Exchange`：OKX、Bybit、Binance、Bitget、Gate 等交易所域名。
+- `Exchange`：OKX、Bybit、Binance、Bitget、Gate、KuCoin、MEXC、Crypto.com、Coinbase、Kraken、HTX、BingX、BitMart、Bitfinex、Bitstamp、Upbit 等交易所域名。
 - `DIRECT`：局域网、国内 IP、钉钉、常规 Apple/iCloud。
-- `Proxies`：普通海外代理兜底；如果订阅里已有 `proxies` / `PROXIES` 等大小写变体，会复用原组名并自动改写规则目标，避免出现两个相似组。
+- `Proxies`：明确海外规则命中的普通代理；如果订阅里已有 `proxies` / `PROXIES` 等大小写变体，会复用原组名并自动改写规则目标，避免出现两个相似组。
 
 使用建议：
 
@@ -24,12 +25,15 @@
 
 交易所注意：
 
-`Exchange` 只是分流隔离，不代表可绕过平台地区限制。交易所出口应按账号自身允许使用的地区选择。
+`Claude`、`AI` 和 `Exchange` 都只是分流隔离，不代表可绕过平台地区限制。`Claude` 只保留 `US`，`AI` 只保留 `US / TW`，`Exchange` 只保留 `TW / SG`，都不混入其它地区、DIRECT 或 Proxies。未知站点最终兜底为 `DIRECT`，避免国内小站误走代理。
 
 兼容策略：
 
 - 安装脚本不再要求订阅必须有固定策略组名。
 - 安装脚本会同步 `profiles.yaml` 中已有订阅绑定的 merge/script 文件，避免当前订阅继续使用旧脚本。
-- `Script.js` 会自动补齐 `Proxies / US / Google / YouTube / Telegram / Exchange`；如果已有大小写不同的同名组，会复用已有组名并改写规则目标。
+- `Script.js` 会自动补齐 `Proxies / Claude / AI / US / Google / YouTube / Telegram / Exchange`；如果已有大小写不同的同名组，会复用已有组名并改写规则目标。
+- `Claude` 组会被强制更新为仅包含 `US`，用于降低 Claude 出口地区变化。
+- `AI` 组会被强制更新为仅包含 `US / TW`，用于降低 AI 服务出口地区变化。
+- `Exchange` 组会被强制更新为仅包含 `TW / SG`，用于降低交易所登录出口地区变化。
 - 能识别地区节点时，自动生成 `HK / JP / SG / TW / US`。
 - 识别不到地区时，降级到 `Proxies` 或 `DIRECT`，优先保证配置能启动。

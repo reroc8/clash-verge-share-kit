@@ -39,14 +39,15 @@
 
 | 你打开的网站 | 它会尽量安排到 |
 |---|---|
-| Claude / ChatGPT / Gemini | 更适合 AI 的线路 |
+| Claude | Claude 专用美区线路 |
+| ChatGPT / Gemini / Copilot / Cursor 等 | AI 专用线路（US / TW） |
 | Google / Gmail / Google 登录 | Google 专用线路 |
 | YouTube | YouTube 专用线路 |
-| OKX / Bybit / Binance | 交易所专用线路 |
+| OKX / Bybit / Binance / Bitget / Gate / KuCoin / MEXC 等 | 交易所专用线路 |
 | 国内网站、局域网、钉钉 | 直连 |
-| 其它海外网站 | 普通代理线路 |
+| 明确海外网站 | 普通代理线路 |
 
-这里说的“线路”，在 Clash Verge Rev 里通常叫“策略组”。你不需要先理解这些名词，安装后能看到 `US / Google / YouTube / Exchange` 这些名字即可。
+这里说的“线路”，在 Clash Verge Rev 里通常叫“策略组”。你不需要先理解这些名词，安装后能看到 `Claude / AI / US / Google / YouTube / Exchange` 这些名字即可。
 
 ## 设计逻辑图
 
@@ -65,7 +66,7 @@ DNS 稳定解析
 每一层只解决一个问题：
 
 - 订阅节点：继续使用你自己的订阅，不带分享者的节点。
-- 自动补策略组：如果订阅里缺少 `US / Google / YouTube / Telegram / Exchange`，脚本会尽量自动补齐。
+- 自动补策略组：如果订阅里缺少 `Claude / AI / US / Google / YouTube / Telegram / Exchange`，脚本会尽量自动补齐。
 - 同步已有订阅：Clash Verge Rev 可能给每个订阅生成随机 merge/script 文件，安装脚本会一并写入，避免只改通用文件但当前订阅不生效。
 - 按业务分流：AI、Google、YouTube、Telegram、交易所、国内网站分开走，减少互相影响。
 - 不做系统级广告拦截：避免国内网站登录、风控、统计接口被误伤；去广告放到浏览器插件层。
@@ -96,19 +97,26 @@ scripts/
 
 | 类型 | 策略组 |
 |---|---|
-| 高风险 AI | `US` |
+| Claude | `Claude` |
+| 其它 AI 服务 | `AI` |
 | Google 账号和 Google 生态 | `Google` |
 | YouTube | `YouTube` |
 | Telegram | `Telegram` |
 | 交易所 | `Exchange` |
 | 国内和局域网 | `DIRECT` |
-| 兜底代理 | `Proxies` |
+| 明确海外代理 | `Proxies` |
 
-`Exchange` 会由 `Script.js` 自动生成，可选项为：
+`Claude`、`AI` 和 `Exchange` 会由 `Script.js` 自动生成，可选项为：
 
 ```text
-Proxies / JP / HK / SG / TW / US / DIRECT
+Claude: US
+AI: US / TW
+Exchange: TW / SG
 ```
+
+`Claude` 只保留美国地区组。`AI` 只保留美国和台湾地区组，不混用港区、日区、新加坡或普通代理兜底。OpenAI、Gemini 这类高风险服务建议优先选 US。
+
+`Exchange` 只保留台湾和新加坡地区组，不混用美区、港区、日区或普通代理兜底。
 
 如果订阅里没有这些固定组名，`Script.js` 会尽量自动识别常见节点和地区名称，并补齐缺失策略组。已有 `proxies` 这类大小写不同的同名组时，会复用原组名并自动改写规则目标，避免出现两个相似策略组。识别不到时会降级到 `Proxies` 或 `DIRECT`，优先保证配置能启动。
 
@@ -173,13 +181,13 @@ dns_config.yaml
 |---|---|---|---|
 | Google | `google.com` 或 Gmail | 能打开、能搜索或进入邮箱 | `Google` 组换一个稳定节点 |
 | YouTube | `youtube.com` | 首页图片能加载，视频能播放 | `YouTube` 组换节点 |
-| Claude | `claude.ai` | 能打开并正常对话 | `US` 组换美国节点，优先低风控节点 |
-| 交易所 | OKX / Bybit / Binance | 页面能打开，登录前确认账号允许地区 | `Exchange` 组选择账号合规地区节点 |
+| Claude | `claude.ai` | 能打开并正常对话 | `Claude` 组只选 US，优先低风控美国节点 |
+| 交易所 | OKX / Bybit / Binance | 页面能打开，登录前确认账号允许地区 | `Exchange` 只选 TW / SG；没有对应节点就先别登录 |
 | 国内网站 | 百度、淘宝、钉钉、腾讯系网站 | 打开速度正常，不绕远 | 确认当前模式不是全局代理 |
 
-如果只有某一类网站异常，先换对应策略组里的节点；如果全部异常，再检查订阅是否过期、系统代理/TUN 是否打开。
+如果只有某一类网站异常，先换对应策略组里的节点；如果国内小站打开异常，先看是否被误判为代理流量；如果全部异常，再检查订阅是否过期、系统代理/TUN 是否打开。
 
-如果代理页没有出现 `US / Google / YouTube / Exchange`，或者日志里提示规则集下载失败，请先确认网络能访问 GitHub 规则源，再打开 Clash Verge Rev 的日志查看具体失败项。
+如果代理页没有出现 `Claude / AI / US / Google / YouTube / Exchange`，或者日志里提示规则集下载失败，请先确认网络能访问 GitHub 规则源，再打开 Clash Verge Rev 的日志查看具体失败项。
 
 ## 让自己的 AI Agent 帮你安装
 
@@ -195,7 +203,7 @@ dns_config.yaml
 4. 解压下载的 zip。
 5. macOS 运行 install-macos.command；Windows 10/11 运行 install-windows.bat。
 6. 安装完成后重新打开 Clash Verge Rev，确认能正常代理。
-7. 如果看到 US / Google / YouTube / Exchange 这些组，只需要按用途选择稳定节点。
+7. 如果看到 Claude / AI / US / Google / YouTube / Exchange 这些组，只需要按用途选择稳定节点。
 ```
 
 <!-- release-readme:end -->
@@ -229,4 +237,4 @@ dist/
 
 ## 免责声明
 
-这套配置只解决 Clash Verge Rev 的分流和 DNS 路径问题。AI 服务、交易所、流媒体平台可能有自己的账号风控和地区限制，使用者需要遵守对应平台规则。
+这套配置只解决 Clash Verge Rev 的分流和 DNS 路径问题。明确命中的海外服务走对应代理组，未命中的未知站点默认直连，减少国内 .com 小站被误送代理导致 502。AI 服务、交易所、流媒体平台可能有自己的账号风控和地区限制，使用者需要遵守对应平台规则。

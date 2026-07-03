@@ -100,49 +100,67 @@ rules:
   - DOMAIN,wallet.google.com,Google
   - DOMAIN-SUFFIX,oauth2.googleapis.com,Google
   - DOMAIN-SUFFIX,oauth2.googleusercontent.com,Google
-  # High-risk / region-sensitive AI fixed to US
-  - DOMAIN-SUFFIX,claude.ai,US
-  - DOMAIN-SUFFIX,claude.com,US
-  - DOMAIN-SUFFIX,anthropic.com,US
-  - DOMAIN-SUFFIX,chatgpt.com,US
-  - DOMAIN-SUFFIX,openai.com,US
-  - DOMAIN-SUFFIX,oaistatic.com,US
-  - DOMAIN-SUFFIX,oaiusercontent.com,US
-  - DOMAIN-SUFFIX,gemini.google.com,US
-  - DOMAIN-SUFFIX,generativelanguage.googleapis.com,US
-  - DOMAIN-SUFFIX,ai.google.dev,US
-  - DOMAIN-SUFFIX,aistudio.google.com,US
-  # Other AI services are proxied but not forced to a US exit
-  - DOMAIN-SUFFIX,notebooklm.google.com,Proxies
-  - DOMAIN-SUFFIX,labs.google,Proxies
-  - DOMAIN-SUFFIX,deepmind.com,Proxies
-  - DOMAIN-SUFFIX,perplexity.ai,Proxies
-  - DOMAIN-SUFFIX,pplx.ai,Proxies
-  - DOMAIN-SUFFIX,poe.com,Proxies
-  - DOMAIN-SUFFIX,x.ai,Proxies
-  - DOMAIN-SUFFIX,grok.com,Proxies
-  - DOMAIN-SUFFIX,cursor.com,Proxies
-  - DOMAIN-SUFFIX,cursor.sh,Proxies
-  - DOMAIN-SUFFIX,cursorapi.com,Proxies
-  - DOMAIN-SUFFIX,windsurf.com,Proxies
-  - DOMAIN-SUFFIX,codeium.com,Proxies
-  - DOMAIN-SUFFIX,copilot.microsoft.com,Proxies
-  - DOMAIN-SUFFIX,githubcopilot.com,Proxies
-  - DOMAIN-SUFFIX,huggingface.co,Proxies
-  - DOMAIN-SUFFIX,hf.co,Proxies
-  - DOMAIN-SUFFIX,replicate.com,Proxies
-  - DOMAIN-SUFFIX,replicate.delivery,Proxies
-  - DOMAIN-SUFFIX,midjourney.com,Proxies
-  - DOMAIN-SUFFIX,runwayml.com,Proxies
-  - DOMAIN-SUFFIX,stability.ai,Proxies
-  - DOMAIN-SUFFIX,clipdrop.co,Proxies
-  - DOMAIN-SUFFIX,ideogram.ai,Proxies
-  - DOMAIN-SUFFIX,leonardo.ai,Proxies
-  - DOMAIN-SUFFIX,mistral.ai,Proxies
-  - DOMAIN-SUFFIX,cohere.com,Proxies
-  - DOMAIN-SUFFIX,meta.ai,Proxies
-  - DOMAIN-SUFFIX,elevenlabs.io,Proxies
-  - DOMAIN-SUFFIX,elevenlabs.com,Proxies
+  # Claude is isolated to a US-only group
+  - DOMAIN-SUFFIX,claude.ai,Claude
+  - DOMAIN-SUFFIX,claude.com,Claude
+  - DOMAIN-SUFFIX,anthropic.com,Claude
+  # Other AI services use a controlled AI group with only US / TW options
+  - DOMAIN-SUFFIX,chatgpt.com,AI
+  - DOMAIN-SUFFIX,openai.com,AI
+  - DOMAIN-SUFFIX,oaistatic.com,AI
+  - DOMAIN-SUFFIX,oaiusercontent.com,AI
+  - DOMAIN-SUFFIX,openaiapi-site.azureedge.net,AI
+  - DOMAIN-SUFFIX,gemini.google.com,AI
+  - DOMAIN-SUFFIX,bard.google.com,AI
+  - DOMAIN-SUFFIX,generativelanguage.googleapis.com,AI
+  - DOMAIN-SUFFIX,ai.google.dev,AI
+  - DOMAIN-SUFFIX,aistudio.google.com,AI
+  - DOMAIN-SUFFIX,makersuite.google.com,AI
+  - DOMAIN-SUFFIX,notebooklm.google.com,AI
+  - DOMAIN-SUFFIX,labs.google,AI
+  - DOMAIN-SUFFIX,deepmind.com,AI
+  - DOMAIN-SUFFIX,perplexity.ai,AI
+  - DOMAIN-SUFFIX,pplx.ai,AI
+  - DOMAIN-SUFFIX,poe.com,AI
+  - DOMAIN-SUFFIX,x.ai,AI
+  - DOMAIN-SUFFIX,grok.com,AI
+  - DOMAIN-SUFFIX,cursor.com,AI
+  - DOMAIN-SUFFIX,cursor.sh,AI
+  - DOMAIN-SUFFIX,cursorapi.com,AI
+  - DOMAIN-SUFFIX,windsurf.com,AI
+  - DOMAIN-SUFFIX,codeium.com,AI
+  - DOMAIN-SUFFIX,copilot.microsoft.com,AI
+  - DOMAIN-SUFFIX,copilot.cloud.microsoft,AI
+  - DOMAIN-SUFFIX,sydney.bing.com,AI
+  - DOMAIN-SUFFIX,githubcopilot.com,AI
+  - DOMAIN-SUFFIX,copilot-proxy.githubusercontent.com,AI
+  - DOMAIN-SUFFIX,huggingface.co,AI
+  - DOMAIN-SUFFIX,hf.co,AI
+  - DOMAIN-SUFFIX,character.ai,AI
+  - DOMAIN-SUFFIX,replicate.com,AI
+  - DOMAIN-SUFFIX,replicate.delivery,AI
+  - DOMAIN-SUFFIX,midjourney.com,AI
+  - DOMAIN-SUFFIX,runwayml.com,AI
+  - DOMAIN-SUFFIX,stability.ai,AI
+  - DOMAIN-SUFFIX,clipdrop.co,AI
+  - DOMAIN-SUFFIX,ideogram.ai,AI
+  - DOMAIN-SUFFIX,leonardo.ai,AI
+  - DOMAIN-SUFFIX,mistral.ai,AI
+  - DOMAIN-SUFFIX,groq.com,AI
+  - DOMAIN-SUFFIX,cohere.ai,AI
+  - DOMAIN-SUFFIX,cohere.com,AI
+  - DOMAIN-SUFFIX,meta.ai,AI
+  - DOMAIN-SUFFIX,elevenlabs.io,AI
+  - DOMAIN-SUFFIX,elevenlabs.com,AI
+  - DOMAIN-SUFFIX,suno.ai,AI
+  - DOMAIN-SUFFIX,suno.com,AI
+  - DOMAIN-SUFFIX,v0.dev,AI
+  - DOMAIN-SUFFIX,sdk.vercel.ai,AI
+  - DOMAIN-SUFFIX,together.ai,AI
+  - DOMAIN-SUFFIX,together.xyz,AI
+  - DOMAIN-SUFFIX,deepseek.com,AI
+  - DOMAIN-SUFFIX,kimi.ai,AI
+  - DOMAIN-SUFFIX,moonshot.cn,AI
   # 钉钉直连规则
   - DOMAIN-SUFFIX,dingtalk.com,DIRECT
   - DOMAIN-SUFFIX,dingtalkcdn.com,DIRECT
@@ -186,5 +204,5 @@ rules:
   # 自定义直连
   - DOMAIN,codebuddy.cn,DIRECT
   - DOMAIN,copilot.tencent.com,DIRECT
-  # 最终兜底
-  - MATCH,Proxies
+  # 最终兜底：未知站点直连，避免国内 .com 被误送代理导致 502
+  - MATCH,DIRECT

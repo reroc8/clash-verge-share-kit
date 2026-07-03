@@ -76,6 +76,19 @@ function main(config, profileName) {
     return unique(result);
   }
 
+  function findGroup(name) {
+    var existingName = findExistingGroup(name);
+    if (!existingName) {
+      return null;
+    }
+    for (var i = 0; i < groups.length; i++) {
+      if (groups[i] && groups[i].name === existingName) {
+        return groups[i];
+      }
+    }
+    return null;
+  }
+
   function ensureGroup(name, options) {
     var existingName = findExistingGroup(name);
     if (existingName) {
@@ -92,6 +105,20 @@ function main(config, profileName) {
     });
     rememberGroupName(name);
     return name;
+  }
+
+  function ensureManagedGroup(name, options) {
+    var existingGroup = findGroup(name);
+    var finalOptions = filterExisting(options);
+    if (finalOptions.length === 0) {
+      finalOptions = ["DIRECT"];
+    }
+    if (existingGroup) {
+      existingGroup.type = "select";
+      existingGroup.proxies = finalOptions;
+      return existingGroup.name;
+    }
+    return ensureGroup(name, finalOptions);
   }
 
   function optionMatches(name, patterns) {
@@ -149,6 +176,7 @@ function main(config, profileName) {
   var managedGroups = {
     Proxies: PROXIES_GROUP
   };
+  var detectedRegions = {};
 
   var regionOrder = ["HK", "JP", "SG", "TW", "US"];
   for (var ro = 0; ro < regionOrder.length; ro++) {
@@ -168,6 +196,7 @@ function main(config, profileName) {
     }
 
     if (regionOptions.length > 0) {
+      detectedRegions[region] = true;
       managedGroups[region] = ensureGroup(region, regionOptions);
     }
   }
@@ -175,10 +204,17 @@ function main(config, profileName) {
   if (!managedGroups.US) {
     managedGroups.US = ensureGroup("US", [PROXIES_GROUP, "DIRECT"]);
   }
+  managedGroups.Claude = ensureManagedGroup("Claude", [
+    detectedRegions.US ? managedGroups.US : null
+  ]);
+  managedGroups.AI = ensureManagedGroup("AI", [
+    detectedRegions.US ? managedGroups.US : null,
+    detectedRegions.TW ? managedGroups.TW : null
+  ]);
   managedGroups.Google = ensureGroup("Google", [PROXIES_GROUP, managedGroups.US, managedGroups.HK, managedGroups.JP, managedGroups.SG, managedGroups.TW, "DIRECT"]);
   managedGroups.YouTube = ensureGroup("YouTube", [PROXIES_GROUP, managedGroups.HK, managedGroups.JP, managedGroups.SG, managedGroups.TW, managedGroups.US, "DIRECT"]);
   managedGroups.Telegram = ensureGroup("Telegram", [PROXIES_GROUP, managedGroups.HK, managedGroups.JP, managedGroups.SG, managedGroups.TW, managedGroups.US]);
-  managedGroups.Exchange = ensureGroup("Exchange", [PROXIES_GROUP, managedGroups.TW, managedGroups.JP, managedGroups.HK, managedGroups.SG, managedGroups.US, "DIRECT"]);
+  managedGroups.Exchange = ensureManagedGroup("Exchange", [managedGroups.TW, managedGroups.SG]);
 
   config["proxy-groups"] = groups;
 
@@ -207,16 +243,45 @@ function main(config, profileName) {
 
   var exchangeDomains = [
     "okx.com",
+    "okx-dns.com",
+    "okex.com",
+    "oklink.com",
     "bybit.com",
     "bybitglobal.com",
+    "bybit.cloud",
     "bycsi.com",
     "bytick.com",
     "binance.com",
     "binance.info",
     "binance.me",
+    "binance.us",
+    "binancecnt.com",
+    "bnbstatic.com",
     "bitget.com",
+    "bitgetimg.com",
+    "bitgetstatic.com",
     "gate.com",
-    "gate.io"
+    "gate.io",
+    "gateimg.com",
+    "kucoin.com",
+    "kucoin.plus",
+    "kucoin.cloud",
+    "mexc.com",
+    "mexc.co",
+    "mexc.fm",
+    "crypto.com",
+    "coinbase.com",
+    "coinbasecdn.net",
+    "kraken.com",
+    "krakenassets.com",
+    "htx.com",
+    "huobi.com",
+    "huobi.pro",
+    "bingx.com",
+    "bitmart.com",
+    "bitfinex.com",
+    "bitstamp.net",
+    "upbit.com"
   ];
 
   var exchangeDomainSet = {};
