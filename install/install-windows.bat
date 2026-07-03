@@ -51,23 +51,46 @@ if errorlevel 1 (
 )
 
 echo 安装前备份到: %BACKUP_DIR%
-if exist "%CLASH_DIR%\profiles\Merge.yaml"   copy "%CLASH_DIR%\profiles\Merge.yaml"   "%BACKUP_DIR%\Merge.yaml" >nul
-if exist "%CLASH_DIR%\profiles\Script.js"    copy "%CLASH_DIR%\profiles\Script.js"    "%BACKUP_DIR%\Script.js" >nul
-if exist "%CLASH_DIR%\verge.yaml"            copy "%CLASH_DIR%\verge.yaml"            "%BACKUP_DIR%\verge.yaml" >nul
-if exist "%CLASH_DIR%\dns_config.yaml"       copy "%CLASH_DIR%\dns_config.yaml"       "%BACKUP_DIR%\dns_config.yaml" >nul
+if exist "%CLASH_DIR%\profiles\Merge.yaml" (
+    call :copy_required "%CLASH_DIR%\profiles\Merge.yaml" "%BACKUP_DIR%\Merge.yaml" "备份"
+    if errorlevel 1 goto install_failed
+)
+if exist "%CLASH_DIR%\profiles\Script.js" (
+    call :copy_required "%CLASH_DIR%\profiles\Script.js" "%BACKUP_DIR%\Script.js" "备份"
+    if errorlevel 1 goto install_failed
+)
+if exist "%CLASH_DIR%\verge.yaml" (
+    call :copy_required "%CLASH_DIR%\verge.yaml" "%BACKUP_DIR%\verge.yaml" "备份"
+    if errorlevel 1 goto install_failed
+)
+if exist "%CLASH_DIR%\dns_config.yaml" (
+    call :copy_required "%CLASH_DIR%\dns_config.yaml" "%BACKUP_DIR%\dns_config.yaml" "备份"
+    if errorlevel 1 goto install_failed
+)
 
 echo 正在安装...
-copy /Y "%CONFIG_DIR%\Merge.yaml"       "%CLASH_DIR%\profiles\Merge.yaml" >nul
-copy /Y "%CONFIG_DIR%\Script.js"        "%CLASH_DIR%\profiles\Script.js" >nul
-powershell -NoProfile -ExecutionPolicy Bypass -Command "$clash=$env:CLASH_DIR; $config=$env:CONFIG_DIR; $backup=$env:BACKUP_DIR; $profiles=Join-Path $clash 'profiles'; $profilesYaml=Join-Path $clash 'profiles.yaml'; if (Test-Path $profilesYaml) { $itemType=$null; Get-Content $profilesYaml | ForEach-Object { if ($_ -match '^- uid:') { $itemType=$null }; if ($_ -match '^\s*type:\s*(merge|script)\s*$') { $itemType=$Matches[1] }; if ($_ -match '^\s*file:\s*([^\s]+)\s*$' -and ($itemType -eq 'merge' -or $itemType -eq 'script')) { $file=$Matches[1].Trim([char]34).Trim([char]39); if ($file -notmatch '[\\/:]' -and $file -notmatch '\.\.') { $dst=Join-Path $profiles $file; $backupDst=Join-Path $backup $file; if ((Test-Path $dst) -and -not (Test-Path $backupDst)) { Copy-Item -Force $dst $backupDst }; if ($itemType -eq 'merge') { Copy-Item -Force (Join-Path $config 'Merge.yaml') $dst } else { Copy-Item -Force (Join-Path $config 'Script.js') $dst } } } } }"
-if errorlevel 1 (
-    echo 错误: 同步已有订阅绑定的 merge/script 文件失败
+call :copy_required "%CONFIG_DIR%\Merge.yaml" "%CLASH_DIR%\profiles\Merge.yaml" "写入配置"
+if errorlevel 1 goto install_failed
+call :copy_required "%CONFIG_DIR%\Script.js" "%CLASH_DIR%\profiles\Script.js" "写入配置"
+if errorlevel 1 goto install_failed
+
+set "SYNC_SCRIPT=%SCRIPT_DIR%sync-profile-bound-files.ps1"
+if not exist "%SYNC_SCRIPT%" set "SYNC_SCRIPT=%SCRIPT_DIR%..\install\sync-profile-bound-files.ps1"
+if not exist "%SYNC_SCRIPT%" (
+    echo 错误: 未找到 sync-profile-bound-files.ps1
     pause
     exit /b 1
 )
-copy /Y "%CONFIG_DIR%\verge.yaml"       "%CLASH_DIR%\verge.yaml" >nul
-copy /Y "%CONFIG_DIR%\dns_config.yaml"  "%CLASH_DIR%\dns_config.yaml" >nul
+powershell -NoProfile -ExecutionPolicy Bypass -File "%SYNC_SCRIPT%" -ClashDir "%CLASH_DIR%" -ConfigDir "%CONFIG_DIR%" -BackupDir "%BACKUP_DIR%"
+if errorlevel 1 (
+    pause
+    exit /b 1
+)
 
+call :copy_required "%CONFIG_DIR%\verge.yaml" "%CLASH_DIR%\verge.yaml" "写入配置"
+if errorlevel 1 goto install_failed
+call :copy_required "%CONFIG_DIR%\dns_config.yaml" "%CLASH_DIR%\dns_config.yaml" "写入配置"
+if errorlevel 1 goto install_failed
 set CLEANUP_COUNT=0
 for /f "skip=5 delims=" %%B in ('dir /b /ad /o-n "%CLASH_DIR%\backup_*" 2^>nul') do (
     rmdir /s /q "%CLASH_DIR%\%%B" 2>nul
@@ -87,3 +110,17 @@ echo 安装后确认: 代理页能看到 Claude / AI / US / Google / YouTube / E
 echo 如果某类网站异常，先换对应策略组节点；如果规则集下载失败，请查看 Clash Verge Rev 日志
 echo 也可以按 README.txt 的“安装后 60 秒检查清单”逐项测试
 pause
+exit /b 0
+
+:install_failed
+echo 安装未完成，请检查上面的错误信息。
+pause
+exit /b 1
+
+:copy_required
+copy /Y "%~1" "%~2" >nul
+if errorlevel 1 (
+    echo 错误: %~3失败: %~1 -^> %~2
+    exit /b 1
+)
+exit /b 0
