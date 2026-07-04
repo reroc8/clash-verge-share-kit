@@ -1,14 +1,35 @@
 param(
-    [Parameter(Mandatory = $true)] [string] $ClashDir,
-    [Parameter(Mandatory = $true)] [string] $ConfigDir,
-    [Parameter(Mandatory = $true)] [string] $BackupDir
+    [string] $ClashDir = $env:SYNC_CLASH_DIR,
+    [string] $ConfigDir = $env:SYNC_CONFIG_DIR,
+    [string] $BackupDir = $env:SYNC_BACKUP_DIR
 )
 
 $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version 2.0
 
+function Require-Directory {
+    param(
+        [string] $Name,
+        [string] $Path
+    )
+
+    if ([string]::IsNullOrWhiteSpace($Path)) {
+        throw "$Name is empty"
+    }
+
+    if (-not (Test-Path -LiteralPath $Path -PathType Container)) {
+        throw "$Name does not exist: $Path"
+    }
+}
+
 try {
+    Require-Directory 'ClashDir' $ClashDir
+    Require-Directory 'ConfigDir' $ConfigDir
+    Require-Directory 'BackupDir' $BackupDir
+
     $profiles = Join-Path $ClashDir 'profiles'
+    Require-Directory 'profiles' $profiles
+
     $profilesYaml = Join-Path $ClashDir 'profiles.yaml'
 
     if (-not (Test-Path -LiteralPath $profilesYaml)) {

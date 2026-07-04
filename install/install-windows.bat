@@ -81,7 +81,20 @@ if not exist "%SYNC_SCRIPT%" (
     pause
     exit /b 1
 )
-powershell -NoProfile -ExecutionPolicy Bypass -File "%SYNC_SCRIPT%" -ClashDir "%CLASH_DIR%" -ConfigDir "%CONFIG_DIR%" -BackupDir "%BACKUP_DIR%"
+if not defined BACKUP_DIR (
+    echo 错误: 备份目录变量为空
+    pause
+    exit /b 1
+)
+if not exist "%BACKUP_DIR%\." (
+    echo 错误: 备份目录不存在: %BACKUP_DIR%
+    pause
+    exit /b 1
+)
+set "SYNC_CLASH_DIR=%CLASH_DIR%"
+set "SYNC_CONFIG_DIR=%CONFIG_DIR%"
+set "SYNC_BACKUP_DIR=%BACKUP_DIR%"
+powershell -NoProfile -ExecutionPolicy Bypass -File "%SYNC_SCRIPT%"
 if errorlevel 1 (
     echo 错误: 同步已有订阅绑定的 merge/script 文件失败
     pause
