@@ -16,6 +16,8 @@
 - 修复 Windows PowerShell 5.1 可能把 UTF-8 无 BOM 的 sync-profile-bound-files.ps1 按本地编码解析，导致安装时报 “string is missing the terminator” 的问题。
 - sync-profile-bound-files.ps1 改为纯 ASCII 内容，Windows 安装脚本继续保留中文错误提示。
 - build-release 增加 sync-profile-bound-files.ps1 纯 ASCII 检查，并在 Release zip 中把该脚本转为 CRLF。
+- Windows 安装脚本改用环境变量向 sync-profile-bound-files.ps1 传递路径，避免空参数触发 PowerShell 交互式提示。
+- sync-profile-bound-files.ps1 取消 Mandatory 参数，改为启动后校验必要目录并输出明确错误。
 
 ## v0.3.9
 
