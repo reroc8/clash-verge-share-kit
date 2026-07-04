@@ -12,7 +12,7 @@ try {
     $profilesYaml = Join-Path $ClashDir 'profiles.yaml'
 
     if (-not (Test-Path -LiteralPath $profilesYaml)) {
-        Write-Host '未找到 profiles.yaml，跳过订阅绑定文件同步'
+        Write-Host 'profiles.yaml not found; skip profile-bound file sync'
         exit 0
     }
 
@@ -58,9 +58,9 @@ try {
         }
     }
 
-    Write-Host "已同步已有订阅绑定的 merge/script 文件: $script:SyncedCount"
+    Write-Host "Synced profile-bound merge/script files: $script:SyncedCount"
     exit 0
 } catch {
-    Write-Host "错误: 同步已有订阅绑定的 merge/script 文件失败: $($_.Exception.Message)"
+    Write-Host "Error: failed to sync profile-bound merge/script files: $($_.Exception.Message)"
     exit 1
 }
