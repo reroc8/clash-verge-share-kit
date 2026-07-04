@@ -83,6 +83,7 @@ if not exist "%SYNC_SCRIPT%" (
 )
 powershell -NoProfile -ExecutionPolicy Bypass -File "%SYNC_SCRIPT%" -ClashDir "%CLASH_DIR%" -ConfigDir "%CONFIG_DIR%" -BackupDir "%BACKUP_DIR%"
 if errorlevel 1 (
+    echo 错误: 同步已有订阅绑定的 merge/script 文件失败
     pause
     exit /b 1
 )

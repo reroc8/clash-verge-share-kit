@@ -11,6 +11,12 @@
 - 移除基础配置里的 Loyalsoldier `reject` 广告拦截规则，降低登录、验证码、风控和国内网站误伤风险。
 - 发布流程新增 `VERSION.txt` 单一版本来源和版本号格式校验，降低发错 zip 的风险。
 
+## v0.3.10
+
+- 修复 Windows PowerShell 5.1 可能把 UTF-8 无 BOM 的 sync-profile-bound-files.ps1 按本地编码解析，导致安装时报 “string is missing the terminator” 的问题。
+- sync-profile-bound-files.ps1 改为纯 ASCII 内容，Windows 安装脚本继续保留中文错误提示。
+- build-release 增加 sync-profile-bound-files.ps1 纯 ASCII 检查，并在 Release zip 中把该脚本转为 CRLF。
+
 ## v0.3.9
 
 - build-release 增加 CHANGELOG.md 校验，正式版本必须有当前版本标题和变更条目。

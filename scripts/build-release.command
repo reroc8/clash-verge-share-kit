@@ -59,6 +59,14 @@ cp "$ROOT_DIR/config/Script.js"        "$TMP_DIR/Script.js"
 cp "$ROOT_DIR/install/install-macos.command" "$TMP_DIR/install-macos.command"
 cp "$ROOT_DIR/install/install-windows.bat"   "$TMP_DIR/install-windows.bat"
 cp "$ROOT_DIR/install/sync-profile-bound-files.ps1" "$TMP_DIR/sync-profile-bound-files.ps1"
+PS1_NONASCII_LOG="$TMP_DIR/ps1-nonascii.txt"
+if LC_ALL=C grep -n '[^[:print:][:space:]]' "$ROOT_DIR/install/sync-profile-bound-files.ps1" > "$PS1_NONASCII_LOG"; then
+    echo "错误: install/sync-profile-bound-files.ps1 必须保持纯 ASCII，避免 Windows PowerShell 5.1 编码解析失败"
+    cat "$PS1_NONASCII_LOG"
+    exit 1
+fi
+rm -f "$PS1_NONASCII_LOG"
+perl -0pi -e 's/\r?\n/\r\n/g' "$TMP_DIR/sync-profile-bound-files.ps1"
 echo "$PACKAGE_VERSION" > "$TMP_DIR/VERSION.txt"
 
 {
