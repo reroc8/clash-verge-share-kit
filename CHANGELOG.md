@@ -20,6 +20,11 @@
 - sync-profile-bound-files.ps1 取消 Mandatory 参数，改为启动后校验必要目录并输出明确错误。
 - Windows 安装脚本改为纯 ASCII 输出，避免 cmd 在不同系统编码下把中文提示误解析成命令；成功提示压缩为小白可读的短信息。
 - Release zip 根目录只保留两个安装入口：`Windows点我安装.bat` 和 `macOS点我安装.command`；英文 install-* 脚本只作为仓库里的维护源文件。
+- Windows 安装脚本补齐失败回滚：安装中途失败时会尝试从本次 backup_* 恢复，并删除本次新建的配置文件。
+- sync-profile-bound-files.ps1 明确使用 UTF-8 读取 profiles.yaml，并把新建的订阅绑定文件写入回滚清单。
+- 移除 macOS 回滚逻辑中无法被 glob 命中的 `.created-files` 死分支，降低维护误导。
+- build-release 修复 Python ZipInfo 默认 STORE 导致 Release zip 未压缩的问题。
+- Windows 安装脚本提前检查 PowerShell，避免无 PowerShell 环境下先创建 backup_* 再失败。
 
 ## v0.3.9
 

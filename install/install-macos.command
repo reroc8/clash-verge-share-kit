@@ -75,9 +75,6 @@ restore_from_backup() {
         [ -f "$backup_file" ] || continue
         file_name="$(basename "$backup_file")"
         case "$file_name" in
-            .created-files)
-                continue
-                ;;
             verge.yaml|dns_config.yaml)
                 restore_path="$CLASH_DIR/$file_name"
                 ;;
