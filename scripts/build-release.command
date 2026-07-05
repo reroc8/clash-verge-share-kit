@@ -111,6 +111,7 @@ with zipfile.ZipFile(dest, "w", compression=zipfile.ZIP_DEFLATED) as archive:
         info = zipfile.ZipInfo(path.as_posix())
         mode = path.stat().st_mode
         info.date_time = time.localtime(path.stat().st_mtime)[:6]
+        info.compress_type = zipfile.ZIP_DEFLATED
         info.external_attr = (mode & 0xFFFF) << 16
         archive.writestr(info, path.read_bytes())
 
