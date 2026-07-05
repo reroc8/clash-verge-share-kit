@@ -142,6 +142,7 @@ function main(config, profileName) {
   for (var pr = 0; pr < proxies.length; pr++) {
     originalProxies.push(proxies[pr].name);
   }
+  var compactGroupsEnabled = originalProxies.length > 0;
 
   var preferredGeneralGroups = [
     "节点选择",
@@ -159,14 +160,17 @@ function main(config, profileName) {
   ];
 
   var generalOptions = [];
-  for (var pg = 0; pg < preferredGeneralGroups.length; pg++) {
-    if (groupNames[preferredGeneralGroups[pg]]) {
-      generalOptions.push(preferredGeneralGroups[pg]);
+  if (!compactGroupsEnabled) {
+    for (var pg = 0; pg < preferredGeneralGroups.length; pg++) {
+      if (groupNames[preferredGeneralGroups[pg]]) {
+        generalOptions.push(preferredGeneralGroups[pg]);
+      }
     }
+    generalOptions = generalOptions.concat(originalGroups);
   }
-  generalOptions = generalOptions.concat(originalGroups).concat(originalProxies).concat(["DIRECT"]);
+  generalOptions = generalOptions.concat(originalProxies).concat(["DIRECT"]);
 
-  var PROXIES_GROUP = ensureGroup("Proxies", generalOptions);
+  var PROXIES_GROUP = ensureManagedGroup("Proxies", generalOptions, ["DIRECT"]);
 
   var regionPatterns = {
     HK: [/香港/i, /Hong Kong/i, /(^|[^A-Za-z])HK([^A-Za-z]|$)/i, /🇭🇰/],
@@ -187,9 +191,11 @@ function main(config, profileName) {
     var regionOptions = [];
     var patterns = regionPatterns[region];
 
-    for (var og = 0; og < originalGroups.length; og++) {
-      if (optionMatches(originalGroups[og], patterns)) {
-        regionOptions.push(originalGroups[og]);
+    if (!compactGroupsEnabled) {
+      for (var og = 0; og < originalGroups.length; og++) {
+        if (optionMatches(originalGroups[og], patterns)) {
+          regionOptions.push(originalGroups[og]);
+        }
       }
     }
     for (var op = 0; op < originalProxies.length; op++) {
@@ -200,12 +206,12 @@ function main(config, profileName) {
 
     if (regionOptions.length > 0) {
       detectedRegions[region] = true;
-      managedGroups[region] = ensureGroup(region, regionOptions);
+      managedGroups[region] = ensureManagedGroup(region, regionOptions, ["DIRECT"]);
     }
   }
 
   if (!managedGroups.US) {
-    managedGroups.US = ensureGroup("US", [PROXIES_GROUP, "DIRECT"]);
+    managedGroups.US = ensureManagedGroup("US", [PROXIES_GROUP, "DIRECT"], ["DIRECT"]);
   }
   managedGroups.Claude = ensureManagedGroup("Claude", [
     detectedRegions.US ? managedGroups.US : null
@@ -214,12 +220,10 @@ function main(config, profileName) {
     detectedRegions.US ? managedGroups.US : null,
     detectedRegions.TW ? managedGroups.TW : null
   ], ["REJECT"]);
-  managedGroups.Google = ensureGroup("Google", [PROXIES_GROUP, managedGroups.US, managedGroups.HK, managedGroups.JP, managedGroups.SG, managedGroups.TW, "DIRECT"]);
-  managedGroups.YouTube = ensureGroup("YouTube", [PROXIES_GROUP, managedGroups.HK, managedGroups.JP, managedGroups.SG, managedGroups.TW, managedGroups.US, "DIRECT"]);
-  managedGroups.Telegram = ensureGroup("Telegram", [PROXIES_GROUP, managedGroups.HK, managedGroups.JP, managedGroups.SG, managedGroups.TW, managedGroups.US]);
+  managedGroups.Google = ensureManagedGroup("Google", [PROXIES_GROUP, managedGroups.US, managedGroups.HK, managedGroups.JP, managedGroups.SG, managedGroups.TW, "DIRECT"], ["DIRECT"]);
+  managedGroups.YouTube = ensureManagedGroup("YouTube", [PROXIES_GROUP, managedGroups.HK, managedGroups.JP, managedGroups.SG, managedGroups.TW, managedGroups.US, "DIRECT"], ["DIRECT"]);
+  managedGroups.Telegram = ensureManagedGroup("Telegram", [PROXIES_GROUP, managedGroups.HK, managedGroups.JP, managedGroups.SG, managedGroups.TW, managedGroups.US], [PROXIES_GROUP]);
   managedGroups.Exchange = ensureManagedGroup("Exchange", [managedGroups.TW, managedGroups.SG], ["REJECT"]);
-
-  config["proxy-groups"] = groups;
 
   var managedTargetMap = {};
   for (var managedName in managedGroups) {
@@ -227,6 +231,28 @@ function main(config, profileName) {
       managedTargetMap[managedName] = managedGroups[managedName];
     }
   }
+
+  if (compactGroupsEnabled) {
+    var keepGroupNames = {};
+    for (var keepName in managedTargetMap) {
+      if (managedTargetMap.hasOwnProperty(keepName)) {
+        keepGroupNames[managedTargetMap[keepName]] = true;
+      }
+    }
+
+    var compactGroups = [];
+    var compactSeen = {};
+    for (var cg = 0; cg < groups.length; cg++) {
+      var compactGroup = groups[cg];
+      if (compactGroup && keepGroupNames[compactGroup.name] && !compactSeen[compactGroup.name]) {
+        compactGroups.push(compactGroup);
+        compactSeen[compactGroup.name] = true;
+      }
+    }
+    groups = compactGroups;
+  }
+
+  config["proxy-groups"] = groups;
 
   function rewriteRuleTarget(rule) {
     if (typeof rule !== "string" || rule.indexOf("(") !== -1) {
