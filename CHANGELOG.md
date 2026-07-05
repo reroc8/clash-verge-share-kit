@@ -25,6 +25,7 @@
 - 移除 macOS 回滚逻辑中无法被 glob 命中的 `.created-files` 死分支，降低维护误导。
 - build-release 修复 Python ZipInfo 默认 STORE 导致 Release zip 未压缩的问题。
 - Windows 安装脚本提前检查 PowerShell，避免无 PowerShell 环境下先创建 backup_* 再失败。
+- build-release 统一 Release zip 内文件权限：普通文件 0644，macOS 安装入口 0755，避免源文件权限差异进入发布包。
 
 ## v0.3.9
 
