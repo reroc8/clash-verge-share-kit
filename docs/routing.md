@@ -12,6 +12,14 @@
 - `DIRECT`：局域网、国内 IP、钉钉、常规 Apple/iCloud、DeepSeek、Kimi、豆包、通义、文心、腾讯元宝、智谱、MiniMax 等中国大陆 AI。
 - `Proxies`：明确海外规则命中的普通代理；如果订阅里已有 `proxies` / `PROXIES` 等大小写变体，会复用原组名并自动改写规则目标，避免出现两个相似组。
 
+代理页显示顺序固定为：
+
+```text
+Claude / AI / Google / YouTube / Telegram / Exchange / US / TW / SG / HK / JP / Proxies
+```
+
+前 6 个是业务组，中间 5 个是地区节点池，最后 `Proxies` 是普通代理兜底。
+
 使用建议：
 
 - AI 不和日常娱乐共用浏览器 Profile。
@@ -42,4 +50,5 @@
 - `AI` 组会被强制更新为仅包含 `US / TW`，用于降低国际 AI 服务出口地区变化；中国大陆 AI 不进入该组。
 - `Exchange` 组会被强制更新为仅包含 `TW / SG`，用于降低交易所登录出口地区变化。
 - 能识别地区节点时，自动生成 `HK / JP / SG / TW / US`。
+- 代理页核心组会重新排序为业务组、地区组、普通代理兜底，不保留订阅原始组的混排顺序。
 - 识别不到地区时，降级到 `Proxies` 或 `DIRECT`，优先保证配置能启动。
