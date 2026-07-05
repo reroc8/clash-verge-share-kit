@@ -78,6 +78,9 @@ DNS 稳定解析
 ## 包含内容
 
 ```text
+macOS点我安装.command
+Windows点我安装.bat
+
 config/
   Merge.yaml
   Script.js
@@ -150,6 +153,8 @@ Windows 10/11 双击：
 ```text
 Windows点我安装.bat
 ```
+
+如果你是从 GitHub 的 Code 下载源码，也同样双击项目根目录这两个中文入口，不要进 `install/` 目录找英文维护脚本。
 
 安装脚本会显示安装包版本和来源目录，然后先备份原文件，再覆盖通用配置，并同步已有订阅绑定的 merge/script 文件：
 
