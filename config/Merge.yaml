@@ -104,7 +104,7 @@ rules:
   - DOMAIN-SUFFIX,claude.ai,Claude
   - DOMAIN-SUFFIX,claude.com,Claude
   - DOMAIN-SUFFIX,anthropic.com,Claude
-  # Other AI services use a controlled AI group with only US / TW options
+  # International AI services use a controlled AI group with only US / TW options
   - DOMAIN-SUFFIX,chatgpt.com,AI
   - DOMAIN-SUFFIX,openai.com,AI
   - DOMAIN-SUFFIX,oaistatic.com,AI
@@ -158,9 +158,47 @@ rules:
   - DOMAIN-SUFFIX,sdk.vercel.ai,AI
   - DOMAIN-SUFFIX,together.ai,AI
   - DOMAIN-SUFFIX,together.xyz,AI
-  - DOMAIN-SUFFIX,deepseek.com,AI
-  - DOMAIN-SUFFIX,kimi.ai,AI
-  - DOMAIN-SUFFIX,moonshot.cn,AI
+  # Mainland China AI services should stay DIRECT, not use the international AI group.
+  # Some of them use .com / .ai / .chat domains, so they must be placed before tld-not-cn / proxy rules.
+  - DOMAIN-SUFFIX,deepseek.com,DIRECT
+  - DOMAIN-SUFFIX,kimi.ai,DIRECT
+  - DOMAIN-SUFFIX,moonshot.cn,DIRECT
+  - DOMAIN-SUFFIX,doubao.com,DIRECT
+  - DOMAIN-SUFFIX,volcengine.com,DIRECT
+  - DOMAIN-SUFFIX,volces.com,DIRECT
+  - DOMAIN-SUFFIX,qwen.ai,DIRECT
+  - DOMAIN-SUFFIX,tongyi.aliyun.com,DIRECT
+  - DOMAIN-SUFFIX,dashscope.aliyuncs.com,DIRECT
+  - DOMAIN-SUFFIX,modelscope.cn,DIRECT
+  - DOMAIN-SUFFIX,yiyan.baidu.com,DIRECT
+  - DOMAIN-SUFFIX,wenxin.baidu.com,DIRECT
+  - DOMAIN-SUFFIX,aistudio.baidu.com,DIRECT
+  - DOMAIN-SUFFIX,baidubce.com,DIRECT
+  - DOMAIN-SUFFIX,yuanbao.tencent.com,DIRECT
+  - DOMAIN-SUFFIX,hunyuan.tencent.com,DIRECT
+  - DOMAIN-SUFFIX,hunyuan.cloud.tencent.com,DIRECT
+  - DOMAIN-SUFFIX,tencentcloudapi.com,DIRECT
+  - DOMAIN-SUFFIX,chatglm.cn,DIRECT
+  - DOMAIN-SUFFIX,zhipuai.cn,DIRECT
+  - DOMAIN-SUFFIX,bigmodel.cn,DIRECT
+  - DOMAIN-SUFFIX,minimax.chat,DIRECT
+  - DOMAIN-SUFFIX,minimax.io,DIRECT
+  - DOMAIN-SUFFIX,hailuoai.com,DIRECT
+  - DOMAIN-SUFFIX,xfyun.cn,DIRECT
+  - DOMAIN-SUFFIX,sparkdesk.cn,DIRECT
+  - DOMAIN-SUFFIX,360.com,DIRECT
+  - DOMAIN-SUFFIX,360.cn,DIRECT
+  - DOMAIN-SUFFIX,baichuan-ai.com,DIRECT
+  - DOMAIN-SUFFIX,baichuan-ai.cn,DIRECT
+  - DOMAIN-SUFFIX,01.ai,DIRECT
+  - DOMAIN-SUFFIX,lingyiwanwu.com,DIRECT
+  - DOMAIN-SUFFIX,stepfun.com,DIRECT
+  - DOMAIN-SUFFIX,stepchat.cn,DIRECT
+  - DOMAIN-SUFFIX,sensenova.cn,DIRECT
+  - DOMAIN-SUFFIX,sensecore.cn,DIRECT
+  - DOMAIN-SUFFIX,sensetime.com,DIRECT
+  - DOMAIN-SUFFIX,metaso.cn,DIRECT
+  - DOMAIN-SUFFIX,metaso.com,DIRECT
   # 钉钉直连规则
   - DOMAIN-SUFFIX,dingtalk.com,DIRECT
   - DOMAIN-SUFFIX,dingtalkcdn.com,DIRECT

@@ -5,11 +5,11 @@
 核心策略：
 
 - `Claude`：Claude / Anthropic 独立组，只保留 `US`。
-- `AI`：OpenAI、Gemini、Copilot、Cursor、Perplexity 等 AI 服务，只保留 `US / TW` 两个地区组；默认优先 US。
+- `AI`：OpenAI、Gemini、Copilot、Cursor、Perplexity 等国际 AI 服务，只保留 `US / TW` 两个地区组；默认优先 US。
 - `Google`：Google 账号、登录、OAuth、支付入口和 Google 生态。
 - `YouTube`：`youtube.com`、`youtu.be`、`youtube-nocookie.com`、`youtubeeducation.com`、`youtubegaming.com`、`youtubekids.com`、`googlevideo.com`、`ytimg.com`、`youtubei.googleapis.com`、`yt3.ggpht.com` 等视频、图片、嵌入播放器和儿童/教育子产品域名。
 - `Exchange`：OKX、Bybit、Binance、Bitget、Gate、KuCoin、MEXC、Crypto.com、Coinbase、Kraken、HTX、BingX、BitMart、Bitfinex、Bitstamp、Upbit 等交易所域名。
-- `DIRECT`：局域网、国内 IP、钉钉、常规 Apple/iCloud。
+- `DIRECT`：局域网、国内 IP、钉钉、常规 Apple/iCloud、DeepSeek、Kimi、豆包、通义、文心、腾讯元宝、智谱、MiniMax 等中国大陆 AI。
 - `Proxies`：明确海外规则命中的普通代理；如果订阅里已有 `proxies` / `PROXIES` 等大小写变体，会复用原组名并自动改写规则目标，避免出现两个相似组。
 
 使用建议：
@@ -25,13 +25,13 @@
 
 最终兜底：
 
-最终规则使用 `MATCH,DIRECT`，不是 `MATCH,Proxies`。原因是国内很多小站是 `.com`，不一定会命中 `direct` 规则集；如果未知域名默认走代理，节点或上游可能返回 502。当前设计把 AI、Google、YouTube、Telegram、交易所、GFW、非 CN TLD、Loyalsoldier proxy 等明确海外流量提前代理，剩余未知流量默认直连，优先保证国内网站和小白用户日常访问稳定。
+最终规则使用 `MATCH,DIRECT`，不是 `MATCH,Proxies`。原因是国内很多小站是 `.com`，不一定会命中 `direct` 规则集；如果未知域名默认走代理，节点或上游可能返回 502。当前设计把国际 AI、Google、YouTube、Telegram、交易所、GFW、非 CN TLD、Loyalsoldier proxy 等明确海外流量提前代理；中国大陆 AI、国内网站和剩余未知流量默认直连，优先保证国内网站和小白用户日常访问稳定。大陆 AI 里有不少 `.com`、`.ai`、`.chat` 域名，所以需要放在 `tld-not-cn` 和 `proxy` 规则集前面显式直连。
 
 这个取舍的副作用是：少数没被规则集覆盖的海外冷门网站可能直连失败。遇到这类网站时，应补明确域名规则，而不是把全局兜底改回 `Proxies`。
 
 交易所注意：
 
-`Claude`、`AI` 和 `Exchange` 都只是分流隔离，不代表可绕过平台地区限制。`Claude` 只保留 `US`，`AI` 只保留 `US / TW`，`Exchange` 只保留 `TW / SG`，都不混入其它地区、DIRECT 或 Proxies；没有对应地区节点时使用 `REJECT`，避免直连泄露或误用其它地区。未知站点最终兜底为 `DIRECT`，避免国内小站误走代理。
+`Claude`、`AI` 和 `Exchange` 都只是分流隔离，不代表可绕过平台地区限制。`Claude` 只保留 `US`，国际 `AI` 只保留 `US / TW`，`Exchange` 只保留 `TW / SG`，都不混入其它地区、DIRECT 或 Proxies；没有对应地区节点时使用 `REJECT`，避免直连泄露或误用其它地区。DeepSeek、Kimi、豆包、通义、文心、腾讯元宝、智谱、MiniMax 等中国大陆 AI 明确走 `DIRECT`。未知站点最终兜底为 `DIRECT`，避免国内小站误走代理。
 
 兼容策略：
 
@@ -39,7 +39,7 @@
 - 安装脚本会同步 `profiles.yaml` 中已有订阅绑定的 merge/script 文件，避免当前订阅继续使用旧脚本。
 - `Script.js` 会自动补齐 `Proxies / Claude / AI / US / Google / YouTube / Telegram / Exchange`；如果已有大小写不同的同名组，会复用已有组名并改写规则目标。
 - `Claude` 组会被强制更新为仅包含 `US`，用于降低 Claude 出口地区变化。
-- `AI` 组会被强制更新为仅包含 `US / TW`，用于降低 AI 服务出口地区变化。
+- `AI` 组会被强制更新为仅包含 `US / TW`，用于降低国际 AI 服务出口地区变化；中国大陆 AI 不进入该组。
 - `Exchange` 组会被强制更新为仅包含 `TW / SG`，用于降低交易所登录出口地区变化。
 - 能识别地区节点时，自动生成 `HK / JP / SG / TW / US`。
 - 识别不到地区时，降级到 `Proxies` 或 `DIRECT`，优先保证配置能启动。
