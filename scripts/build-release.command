@@ -58,6 +58,7 @@ cp "$ROOT_DIR/config/Merge.yaml"       "$TMP_DIR/Merge.yaml"
 cp "$ROOT_DIR/config/Script.js"        "$TMP_DIR/Script.js"
 cp "$ROOT_DIR/install/install-macos.command" "$TMP_DIR/install-macos.command"
 cp "$ROOT_DIR/install/install-windows.bat"   "$TMP_DIR/install-windows.bat"
+cp "$ROOT_DIR/install/install-windows.bat"   "$TMP_DIR/Windows点我安装.bat"
 cp "$ROOT_DIR/install/sync-profile-bound-files.ps1" "$TMP_DIR/sync-profile-bound-files.ps1"
 PS1_NONASCII_LOG="$TMP_DIR/ps1-nonascii.txt"
 if LC_ALL=C grep -n '[^[:print:][:space:]]' "$ROOT_DIR/install/sync-profile-bound-files.ps1" > "$PS1_NONASCII_LOG"; then
@@ -90,12 +91,48 @@ if ! grep -q "安装方式" "$TMP_DIR/README.txt"; then
     exit 1
 fi
 
-perl -0pi -e 's/\r?\n/\r\n/g' "$TMP_DIR/install-windows.bat"
+perl -0pi -e 's/\r?\n/\r\n/g' "$TMP_DIR/install-windows.bat" "$TMP_DIR/Windows点我安装.bat"
 
 rm -f "$DIST_DIR/$ZIP_NAME"
 
 cd "$TMP_DIR"
-zip -qr "$DIST_DIR/$ZIP_NAME" .
+python3 - "$DIST_DIR/$ZIP_NAME" <<'PY'
+from pathlib import Path
+import sys
+import time
+import zipfile
+
+dest = Path(sys.argv[1])
+root = Path(".")
+
+with zipfile.ZipFile(dest, "w", compression=zipfile.ZIP_DEFLATED) as archive:
+    for path in sorted(root.rglob("*"), key=lambda item: item.as_posix()):
+        if not path.is_file():
+            continue
+        info = zipfile.ZipInfo(path.as_posix())
+        mode = path.stat().st_mode
+        info.date_time = time.localtime(path.stat().st_mtime)[:6]
+        info.external_attr = (mode & 0xFFFF) << 16
+        archive.writestr(info, path.read_bytes())
+
+with zipfile.ZipFile(dest) as archive:
+    names = set(archive.namelist())
+    required = {
+        "Windows点我安装.bat",
+        "install-windows.bat",
+        "install-macos.command",
+        "sync-profile-bound-files.ps1",
+        "README.txt",
+        "VERSION.txt",
+    }
+    missing = sorted(required - names)
+    if missing:
+        raise SystemExit("missing release files: " + ", ".join(missing))
+
+    cn_info = archive.getinfo("Windows点我安装.bat")
+    if not (cn_info.flag_bits & 0x800):
+        raise SystemExit("Windows点我安装.bat is not marked as UTF-8 in zip")
+PY
 
 if [ -n "$VERSION" ] && [ "${KEEP_OLD_ZIPS:-0}" != "1" ]; then
     find "$DIST_DIR" -type f -name 'clash-verge-share-kit-*.zip' ! -name "$ZIP_NAME" -delete
