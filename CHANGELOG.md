@@ -11,6 +11,10 @@
 - 移除基础配置里的 Loyalsoldier `reject` 广告拦截规则，降低登录、验证码、风控和国内网站误伤风险。
 - 发布流程新增 `VERSION.txt` 单一版本来源和版本号格式校验，降低发错 zip 的风险。
 
+## v0.3.11
+
+- Script.js 新增策略组界面压缩：普通内联节点订阅只保留核心业务组，隐藏订阅自带的杂乱原始策略组；无内联节点订阅保守保留原始组。
+
 ## v0.3.10
 
 - 修复 Windows PowerShell 5.1 可能把 UTF-8 无 BOM 的 sync-profile-bound-files.ps1 按本地编码解析，导致安装时报 “string is missing the terminator” 的问题。
@@ -27,7 +31,6 @@
 - Windows 安装脚本提前检查 PowerShell，避免无 PowerShell 环境下先创建 backup_* 再失败。
 - build-release 统一 Release zip 内文件权限：普通文件 0644，macOS 安装入口 0755，避免源文件权限差异进入发布包。
 - 仓库根目录也新增 `Windows点我安装.bat` 和 `macOS点我安装.command`，避免从 GitHub Code 下载源码时只看到英文 install-* 维护脚本。
-- Script.js 新增策略组界面压缩：普通内联节点订阅只保留核心业务组，隐藏订阅自带的杂乱原始策略组；无内联节点订阅保守保留原始组。
 
 ## v0.3.9
 
