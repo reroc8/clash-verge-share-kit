@@ -148,8 +148,10 @@ install-macos.command
 Windows 10/11 双击：
 
 ```text
-install-windows.bat
+Windows点我安装.bat
 ```
+
+如果中文文件名在少数解压工具里显示异常，也可以双击同目录下的 `install-windows.bat`。
 
 安装脚本会显示安装包版本和来源目录，然后先备份原文件，再覆盖通用配置，并同步已有订阅绑定的 merge/script 文件：
 
@@ -202,7 +204,7 @@ dns_config.yaml
 2. 先确认我已经安装 Clash Verge Rev，并且已经导入自己的订阅。
 3. 让我完全退出 Clash Verge Rev。
 4. 解压下载的 zip。
-5. macOS 运行 install-macos.command；Windows 10/11 运行 install-windows.bat。
+5. macOS 运行 install-macos.command；Windows 10/11 运行 Windows点我安装.bat。如果文件名显示异常，再运行 install-windows.bat。
 6. 安装完成后重新打开 Clash Verge Rev，确认能正常代理。
 7. 如果看到 Claude / AI / US / Google / YouTube / Exchange 这些组，只需要按用途选择稳定节点。
 ```
