@@ -40,7 +40,8 @@
 | 你打开的网站 | 它会尽量安排到 |
 |---|---|
 | Claude | Claude 专用美区线路 |
-| ChatGPT / Gemini / Copilot / Cursor 等 | AI 专用线路（US / TW） |
+| ChatGPT / Gemini / Copilot / Cursor 等国际 AI | AI 专用线路（US / TW） |
+| DeepSeek / Kimi / 豆包 / 通义 / 文心 / 腾讯元宝 / 智谱 / MiniMax 等中国大陆 AI | 直连 |
 | Google / Gmail / Google 登录 | Google 专用线路 |
 | YouTube / YouTube Kids / 嵌入播放器 | YouTube 专用线路 |
 | OKX / Bybit / Binance / Bitget / Gate / KuCoin / MEXC 等 | 交易所专用线路 |
@@ -103,7 +104,8 @@ scripts/
 | 类型 | 策略组 |
 |---|---|
 | Claude | `Claude` |
-| 其它 AI 服务 | `AI` |
+| 国际 AI 服务 | `AI` |
+| 中国大陆 AI 服务 | `DIRECT` |
 | Google 账号和 Google 生态 | `Google` |
 | YouTube / YouTube Kids / 嵌入播放器 | `YouTube` |
 | Telegram | `Telegram` |
@@ -120,6 +122,8 @@ Exchange: TW / SG
 ```
 
 `Claude` 只保留美国地区组。`AI` 只保留美国和台湾地区组，不混用港区、日区、新加坡或普通代理兜底。没有对应地区节点时会显示 `REJECT`，表示不要登录或使用该类服务。OpenAI、Gemini 这类高风险服务建议优先选 US。
+
+DeepSeek、Kimi、豆包、通义、文心、腾讯元宝、智谱、MiniMax 等中国大陆 AI 不进入 `AI` 组，而是明确走 `DIRECT`。它们的账号、服务和合规环境更接近中国大陆产品，强行走 US / TW 反而容易触发错误地区判断。部分大陆 AI 使用 `.com`、`.ai`、`.chat` 域名，所以不能只看顶级域名来判断是否海外。
 
 `Exchange` 只保留台湾和新加坡地区组，不混用美区、港区、日区或普通代理兜底。
 
@@ -157,7 +161,7 @@ Windows 10/11 双击：
 Windows点我安装.bat
 ```
 
-如果你是从 GitHub 的 Code 下载源码，也同样双击项目根目录这两个中文入口，不要进 `install/` 目录找英文维护脚本。
+如果你是从 GitHub 的 Code 下载源码，也同样双击项目根目录这两个中文入口，不要进 `install/` 目录找维护脚本。
 
 安装脚本会显示安装包版本和来源目录，然后先备份原文件，再覆盖通用配置，并同步已有订阅绑定的 merge/script 文件：
 

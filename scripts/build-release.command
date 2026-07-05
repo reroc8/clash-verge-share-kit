@@ -92,6 +92,15 @@ fi
 
 perl -0pi -e 's/\r?\n/\r\n/g' "$TMP_DIR/Windows点我安装.bat"
 
+if ! grep -q "安装完成" "$TMP_DIR/Windows点我安装.bat"; then
+    echo "错误: Windows 安装入口缺少中文完成提示"
+    exit 1
+fi
+if grep -q "Package version:" "$TMP_DIR/Windows点我安装.bat"; then
+    echo "错误: Windows 安装入口仍包含英文安装提示"
+    exit 1
+fi
+
 rm -f "$DIST_DIR/$ZIP_NAME"
 
 cd "$TMP_DIR"
