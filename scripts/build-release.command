@@ -108,11 +108,12 @@ with zipfile.ZipFile(dest, "w", compression=zipfile.ZIP_DEFLATED) as archive:
     for path in sorted(root.rglob("*"), key=lambda item: item.as_posix()):
         if not path.is_file():
             continue
-        info = zipfile.ZipInfo(path.as_posix())
-        mode = path.stat().st_mode
+        archive_name = path.as_posix()
+        info = zipfile.ZipInfo(archive_name)
+        permission_bits = 0o755 if archive_name == "macOS点我安装.command" else 0o644
         info.date_time = time.localtime(path.stat().st_mtime)[:6]
         info.compress_type = zipfile.ZIP_DEFLATED
-        info.external_attr = (mode & 0xFFFF) << 16
+        info.external_attr = ((0o100000 | permission_bits) & 0xFFFF) << 16
         archive.writestr(info, path.read_bytes())
 
 with zipfile.ZipFile(dest) as archive:
@@ -132,6 +133,12 @@ with zipfile.ZipFile(dest) as archive:
         cn_info = archive.getinfo(name)
         if not (cn_info.flag_bits & 0x800):
             raise SystemExit(f"{name} is not marked as UTF-8 in zip")
+
+    for item in archive.infolist():
+        expected_mode = 0o755 if item.filename == "macOS点我安装.command" else 0o644
+        actual_mode = (item.external_attr >> 16) & 0o777
+        if actual_mode != expected_mode:
+            raise SystemExit(f"{item.filename} mode is {oct(actual_mode)}, expected {oct(expected_mode)}")
 PY
 
 if [ -n "$VERSION" ] && [ "${KEEP_OLD_ZIPS:-0}" != "1" ]; then
