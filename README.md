@@ -48,7 +48,15 @@
 | 国内网站、局域网、钉钉 | 直连 |
 | 明确海外网站 | 普通代理线路 |
 
-这里说的“线路”，在 Clash Verge Rev 里通常叫“策略组”。你不需要先理解这些名词，安装后能看到 `Claude / AI / US / Google / YouTube / Exchange` 这些名字即可。
+这里说的“线路”，在 Clash Verge Rev 里通常叫“策略组”。你不需要先理解这些名词，安装后能看到 `Claude / AI / Google / YouTube / Telegram / Exchange` 这些业务组即可。
+
+代理页核心组会按下面顺序显示：
+
+```text
+Claude / AI / Google / YouTube / Telegram / Exchange / US / TW / SG / HK / JP / Proxies
+```
+
+前面是按用途选择的业务组，中间是地区节点池，最后 `Proxies` 是普通海外代理兜底。
 
 ## 设计逻辑图
 
@@ -127,6 +135,25 @@ DeepSeek、Kimi、豆包、通义、文心、腾讯元宝、智谱、MiniMax 等
 
 `Exchange` 只保留台湾和新加坡地区组，不混用美区、港区、日区或普通代理兜底。
 
+代理页核心组会按下面顺序显示：
+
+```text
+Claude
+AI
+Google
+YouTube
+Telegram
+Exchange
+US
+TW
+SG
+HK
+JP
+Proxies
+```
+
+前 6 个是常用业务组，中间 5 个是地区节点池，最后 `Proxies` 是普通海外代理兜底。
+
 如果订阅里没有这些固定组名，`Script.js` 会尽量自动识别常见节点和地区名称，并补齐缺失策略组。已有 `proxies` 这类大小写不同的同名组时，会复用原组名并自动改写规则目标，避免出现两个相似策略组。识别不到时会降级到 `Proxies` 或 `DIRECT`，优先保证配置能启动。
 
 普通机场订阅通常会带很多自有策略组。安装后这些原始策略组会从代理页隐藏，只保留 `Claude / AI / US / TW / SG / Google / YouTube / Telegram / Exchange / Proxies` 这类核心组；节点本身不会删除。
@@ -201,7 +228,7 @@ dns_config.yaml
 
 如果只有某一类网站异常，先换对应策略组里的节点；如果国内小站打开异常，先看是否被误判为代理流量；如果全部异常，再检查订阅是否过期、系统代理/TUN 是否打开。
 
-如果代理页没有出现 `Claude / AI / US / Google / YouTube / Exchange`，或者日志里提示规则集下载失败，请先确认网络能访问 GitHub 规则源，再打开 Clash Verge Rev 的日志查看具体失败项。
+如果代理页没有出现 `Claude / AI / Google / YouTube / Telegram / Exchange`，或者日志里提示规则集下载失败，请先确认网络能访问 GitHub 规则源，再打开 Clash Verge Rev 的日志查看具体失败项。
 
 ## 让自己的 AI Agent 帮你安装
 
@@ -217,7 +244,7 @@ dns_config.yaml
 4. 解压下载的 zip。
 5. macOS 运行 macOS点我安装.command；Windows 10/11 运行 Windows点我安装.bat。
 6. 安装完成后重新打开 Clash Verge Rev，确认能正常代理。
-7. 如果看到 Claude / AI / US / Google / YouTube / Exchange 这些组，只需要按用途选择稳定节点。
+7. 如果看到 Claude / AI / Google / YouTube / Telegram / Exchange 这些组，只需要按用途选择稳定节点。
 ```
 
 <!-- release-readme:end -->

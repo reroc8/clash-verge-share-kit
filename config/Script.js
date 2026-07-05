@@ -252,6 +252,45 @@ function main(config, profileName) {
     groups = compactGroups;
   }
 
+  var displayGroupOrder = [
+    managedGroups.Claude,
+    managedGroups.AI,
+    managedGroups.Google,
+    managedGroups.YouTube,
+    managedGroups.Telegram,
+    managedGroups.Exchange,
+    managedGroups.US,
+    managedGroups.TW,
+    managedGroups.SG,
+    managedGroups.HK,
+    managedGroups.JP,
+    PROXIES_GROUP
+  ];
+  var orderedGroups = [];
+  var orderedSeen = {};
+  function appendGroupByName(name) {
+    if (!name || orderedSeen[name]) {
+      return;
+    }
+    for (var ag = 0; ag < groups.length; ag++) {
+      if (groups[ag] && groups[ag].name === name) {
+        orderedGroups.push(groups[ag]);
+        orderedSeen[name] = true;
+        return;
+      }
+    }
+  }
+  for (var og = 0; og < displayGroupOrder.length; og++) {
+    appendGroupByName(displayGroupOrder[og]);
+  }
+  for (var rg = 0; rg < groups.length; rg++) {
+    if (groups[rg] && groups[rg].name && !orderedSeen[groups[rg].name]) {
+      orderedGroups.push(groups[rg]);
+      orderedSeen[groups[rg].name] = true;
+    }
+  }
+  groups = orderedGroups;
+
   config["proxy-groups"] = groups;
 
   function rewriteRuleTarget(rule) {
