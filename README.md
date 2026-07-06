@@ -100,6 +100,7 @@ config/
 install/
   install-macos.command
   install-windows.bat
+  install-windows.ps1
   sync-profile-bound-files.ps1
 
 scripts/
@@ -187,6 +188,8 @@ Windows 10/11 双击：
 ```text
 Windows点我安装.bat
 ```
+
+Windows 的 `.bat` 只是双击入口，真正安装逻辑在 `install-windows.ps1`。普通用户仍然只需要双击 `Windows点我安装.bat`。
 
 如果你是从 GitHub 的 Code 下载源码，也同样双击项目根目录这两个中文入口，不要进 `install/` 目录找维护脚本。
 
