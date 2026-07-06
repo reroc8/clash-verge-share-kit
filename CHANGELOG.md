@@ -11,6 +11,12 @@
 - 移除基础配置里的 Loyalsoldier `reject` 广告拦截规则，降低登录、验证码、风控和国内网站误伤风险。
 - 发布流程新增 `VERSION.txt` 单一版本来源和版本号格式校验，降低发错 zip 的风险。
 
+## v0.3.15
+
+- Windows 安装结构改为 `.bat` 极简双击入口，真正安装、备份、同步和回滚逻辑迁移到 `install-windows.ps1`。
+- `install-windows.ps1` 保持纯 ASCII，通过 Base64 输出中文提示，兼顾 Windows PowerShell 5.1 编码兼容和中文安装体验。
+- Release 包新增 `install-windows.ps1`，并在 build-release 中校验 Windows `.bat` / `.ps1` 都保持纯 ASCII。
+
 ## v0.3.14
 
 - Windows 安装脚本改为纯 ASCII 批处理主体，通过 PowerShell 按 UTF-8 输出中文提示，避免 cmd 把中文行误解析成命令。

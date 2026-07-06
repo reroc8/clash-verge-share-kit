@@ -57,6 +57,7 @@ cp "$ROOT_DIR/config/dns_config.yaml"  "$TMP_DIR/dns_config.yaml"
 cp "$ROOT_DIR/config/Merge.yaml"       "$TMP_DIR/Merge.yaml"
 cp "$ROOT_DIR/config/Script.js"        "$TMP_DIR/Script.js"
 cp "$ROOT_DIR/install/install-windows.bat"   "$TMP_DIR/Windows点我安装.bat"
+cp "$ROOT_DIR/install/install-windows.ps1"   "$TMP_DIR/install-windows.ps1"
 cp "$ROOT_DIR/install/install-macos.command" "$TMP_DIR/macOS点我安装.command"
 cp "$ROOT_DIR/install/sync-profile-bound-files.ps1" "$TMP_DIR/sync-profile-bound-files.ps1"
 BAT_NONASCII_LOG="$TMP_DIR/bat-nonascii.txt"
@@ -66,6 +67,13 @@ if LC_ALL=C grep -n '[^[:print:][:space:]]' "$ROOT_DIR/install/install-windows.b
     exit 1
 fi
 rm -f "$BAT_NONASCII_LOG"
+INSTALL_PS1_NONASCII_LOG="$TMP_DIR/install-ps1-nonascii.txt"
+if LC_ALL=C grep -n '[^[:print:][:space:]]' "$ROOT_DIR/install/install-windows.ps1" > "$INSTALL_PS1_NONASCII_LOG"; then
+    echo "错误: install/install-windows.ps1 必须保持纯 ASCII，避免 Windows PowerShell 5.1 编码解析失败"
+    cat "$INSTALL_PS1_NONASCII_LOG"
+    exit 1
+fi
+rm -f "$INSTALL_PS1_NONASCII_LOG"
 PS1_NONASCII_LOG="$TMP_DIR/ps1-nonascii.txt"
 if LC_ALL=C grep -n '[^[:print:][:space:]]' "$ROOT_DIR/install/sync-profile-bound-files.ps1" > "$PS1_NONASCII_LOG"; then
     echo "错误: install/sync-profile-bound-files.ps1 必须保持纯 ASCII，避免 Windows PowerShell 5.1 编码解析失败"
@@ -73,6 +81,7 @@ if LC_ALL=C grep -n '[^[:print:][:space:]]' "$ROOT_DIR/install/sync-profile-boun
     exit 1
 fi
 rm -f "$PS1_NONASCII_LOG"
+perl -0pi -e 's/\r?\n/\r\n/g' "$TMP_DIR/install-windows.ps1"
 perl -0pi -e 's/\r?\n/\r\n/g' "$TMP_DIR/sync-profile-bound-files.ps1"
 echo "$PACKAGE_VERSION" > "$TMP_DIR/VERSION.txt"
 
@@ -99,8 +108,12 @@ fi
 
 perl -0pi -e 's/\r?\n/\r\n/g' "$TMP_DIR/Windows点我安装.bat"
 
-if ! grep -q "5a6J6KOF5a6M5oiQ44CC" "$TMP_DIR/Windows点我安装.bat"; then
-    echo "错误: Windows 安装入口缺少中文完成提示的 Base64 文案"
+if ! grep -q "install-windows.ps1" "$TMP_DIR/Windows点我安装.bat"; then
+    echo "错误: Windows 安装入口必须只负责启动 install-windows.ps1"
+    exit 1
+fi
+if ! grep -q "5a6J6KOF5a6M5oiQ44CC" "$TMP_DIR/install-windows.ps1"; then
+    echo "错误: Windows PowerShell 安装脚本缺少中文完成提示的 Base64 文案"
     exit 1
 fi
 if grep -q "Package version:" "$TMP_DIR/Windows点我安装.bat"; then
@@ -136,6 +149,7 @@ with zipfile.ZipFile(dest) as archive:
     names = set(archive.namelist())
     required = {
         "Windows点我安装.bat",
+        "install-windows.ps1",
         "macOS点我安装.command",
         "sync-profile-bound-files.ps1",
         "README.txt",
