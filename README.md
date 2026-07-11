@@ -106,6 +106,9 @@ install/
 scripts/
   check-sensitive.sh
   build-release.command
+
+tests/
+  test-script.js
 ```
 
 ## 技术分流逻辑
@@ -155,9 +158,9 @@ Proxies
 
 前 6 个是常用业务组，中间 5 个是地区节点池，最后 `Proxies` 是普通海外代理兜底。
 
-如果订阅里没有这些固定组名，`Script.js` 会尽量自动识别常见节点和地区名称，并补齐缺失策略组。已有 `proxies` 这类大小写不同的同名组时，会复用原组名并自动改写规则目标，避免出现两个相似策略组。识别不到时会降级到 `Proxies` 或 `DIRECT`，优先保证配置能启动。
+如果订阅里没有这些固定组名，`Script.js` 会尽量自动识别常见节点和地区名称，并补齐缺失策略组。已有 `proxies` 这类大小写不同的同名组时，会复用原组名并自动改写规则目标。若节点本身恰好叫 `US`、`TW`、`Proxies` 等固定组名，自动策略组会改用 `US Group`、`TW Group`、`Proxies Group` 这类备用名，避免和节点同名形成循环。识别不到时会降级到 `Proxies` 或 `DIRECT`，优先保证配置能启动。
 
-普通机场订阅通常会带很多自有策略组。安装后这些原始策略组会从代理页隐藏，只保留 `Claude / AI / US / TW / SG / Google / YouTube / Telegram / Exchange / Proxies` 这类核心组；节点本身不会删除。
+普通机场订阅通常会带很多自有策略组。对于节点直接写在 `proxies` 中、且不使用 `proxy-providers` 的普通订阅，安装后会隐藏杂乱原始组，只保留核心组；节点本身不会删除。只要订阅使用或混合使用 `proxy-providers`，脚本就会保守保留原始 provider 策略组，避免为了界面简洁而丢失节点入口。
 
 <!-- release-readme:resume -->
 
@@ -202,7 +205,7 @@ verge.yaml
 dns_config.yaml
 ```
 
-安装脚本不会修改订阅和节点。备份目录只保留最近 5 个 `backup_*`，避免长期堆积。
+安装脚本不会修改订阅和节点。安装器自动生成的备份只保留最近 5 个，避免长期堆积；`backup_*_manual_*` 等手工备份不会被自动删除。
 如果安装中途失败，脚本会尽量用本次备份恢复到安装前状态；极端情况下仍可按下面方式手动还原。
 
 ## 如何从备份还原
@@ -213,7 +216,8 @@ dns_config.yaml
 2. 打开安装脚本提示的 `backup_*` 目录。
 3. 把 `Merge.yaml`、`Script.js`，以及备份目录里其它随机命名的 `.yaml` / `.js` 复制回 Clash Verge Rev 数据目录里的 `profiles/`。
 4. 把 `verge.yaml`、`dns_config.yaml` 复制回 Clash Verge Rev 数据目录根目录。
-5. 重新打开 Clash Verge Rev。
+5. 如果备份目录里的 `created-files.txt` 不是空的，删除其中逐行列出的文件；这些文件在安装前不存在，是本次安装新建的。
+6. 重新打开 Clash Verge Rev。
 
 安装脚本不会自动还原备份，避免误覆盖你安装后的新配置。
 
@@ -231,7 +235,7 @@ dns_config.yaml
 
 如果只有某一类网站异常，先换对应策略组里的节点；如果国内小站打开异常，先看是否被误判为代理流量；如果全部异常，再检查订阅是否过期、系统代理/TUN 是否打开。
 
-如果代理页没有出现 `Claude / AI / Google / YouTube / Telegram / Exchange`，或者日志里提示规则集下载失败，请先确认网络能访问 GitHub 规则源，再打开 Clash Verge Rev 的日志查看具体失败项。
+如果代理页没有出现 `Claude / AI / Google / YouTube / Telegram / Exchange`，或者日志里提示规则集下载失败，请先确认 `Proxies` 里有可用节点，再打开 Clash Verge Rev 的日志查看具体失败项。远程规则集更新会显式通过 `Proxies` 下载，首次安装不再完全依赖直连 GitHub。
 
 ## 让自己的 AI Agent 帮你安装
 

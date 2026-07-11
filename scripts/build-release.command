@@ -48,6 +48,15 @@ fi
 TMP_DIR=$(mktemp -d)
 trap 'rm -rf "$TMP_DIR"' EXIT
 
+if ! command -v node >/dev/null 2>&1; then
+    echo "错误: 未找到 Node.js，无法运行 Script.js 回归测试"
+    exit 1
+fi
+node --check "$ROOT_DIR/config/Script.js"
+node "$ROOT_DIR/tests/test-script.js"
+bash -n "$ROOT_DIR/install/install-macos.command"
+bash -n "$ROOT_DIR/scripts/check-sensitive.sh"
+
 "$ROOT_DIR/scripts/check-sensitive.sh"
 
 mkdir -p "$DIST_DIR"
@@ -120,6 +129,8 @@ if grep -q "Package version:" "$TMP_DIR/Windows点我安装.bat"; then
     echo "错误: Windows 安装入口仍包含英文安装提示"
     exit 1
 fi
+
+"$ROOT_DIR/scripts/check-sensitive.sh" "$TMP_DIR"
 
 rm -f "$DIST_DIR/$ZIP_NAME"
 

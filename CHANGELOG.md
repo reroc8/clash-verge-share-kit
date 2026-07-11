@@ -1,5 +1,24 @@
 # Changelog
 
+## v0.3.16
+
+- 修复节点名恰好为 `US / TW / Proxies` 等固定组名时，自动策略组形成同名循环并导致 Mihomo 拒绝启动的问题。
+- 固定组因节点同名而使用备用名称时，同步改写 `rule-providers.*.proxy`，避免规则集下载误指向同名节点。
+- 兼容订阅里的旧式 `FINAL,策略组` 兜底规则：自动转换为 Mihomo 支持的 `MATCH,策略组`，并同步改写备用策略组名称。
+- 按括号层级解析 `AND / OR / NOT` 组合规则，确保组名复用或改名后，组合规则目标也能同步更新。
+- 修复同时包含内联节点和 `proxy-providers` 的混合订阅被错误压缩、provider 策略组和节点入口消失的问题。
+- provider 订阅已有 `Proxies / US / TW / SG` 等现成组时直接保留其 `use/filter/url-test` 配置，避免重写后形成策略组自循环。
+- 强制管理已有 `Claude / AI / Exchange` 等业务组时清理 `use/filter/include-all` 等动态包含字段，防止受控地区之外的节点重新混入。
+- 补充 OpenAI 专用域名及 OKX / Binance 相关资源域名，减少 AI 和交易所会话落入普通 `Proxies` 的出口拆分。
+- Loyalsoldier 远程规则集显式通过 `Proxies` 下载，降低新机器首次直连 GitHub Raw 失败的概率。
+- 敏感信息扫描新增 `CHANGELOG.md`、测试目录和最终打包目录，临时扫描文件改用随机文件名，避免并发扫描冲突。
+- 自动备份清理仅处理安装器标准命名的备份，不再删除 `backup_*_manual_*` 手工备份。
+- 新建文件清单改为可见的 `created-files.txt`，文档补充精确手动还原步骤。
+- `created-files.txt` 对重复路径去重，避免同一缺失文件同时作为通用绑定和订阅绑定时重复列出。
+- 调整 merge/script 写入顺序，修复通用文件安装前不存在时，同步步骤把新文件误存为旧备份、失败回滚后仍残留新配置的问题。
+- macOS 安装脚本读取 `profiles.yaml` 时保留完整文件名，兼容带空格的 merge/script 文件名。
+- 发布前新增 `Script.js` 语法检查和回归测试。
+
 ## 升级摘要：v0.3.4 -> v0.3.8
 
 - 分流结构从“AI 主要走 US、交易所可选多地区”调整为更明确的受控组：`Claude: US`、`AI: US / TW`、`Exchange: TW / SG`。
