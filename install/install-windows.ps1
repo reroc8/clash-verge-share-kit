@@ -36,7 +36,7 @@ function Restore-FromBackup {
     }
 
     Get-ChildItem -LiteralPath $script:BackupDir -File | ForEach-Object {
-        if ($_.Name -eq '.created-files') { return }
+        if ($_.Name -eq 'created-files.txt') { return }
         if ($_.Name -eq 'verge.yaml' -or $_.Name -eq 'dns_config.yaml') {
             $target = Join-Path $script:ClashDir $_.Name
         } else {
@@ -78,7 +78,10 @@ function Backup-ExistingFile {
             Copy-Item -LiteralPath $Source -Destination $backupPath -Force -ErrorAction Stop
         }
     } else {
-        [System.IO.File]::AppendAllText($script:CreatedFilesList, $Source + [Environment]::NewLine, [System.Text.Encoding]::UTF8)
+        $createdFiles = @(Get-Content -LiteralPath $script:CreatedFilesList -Encoding UTF8 -ErrorAction SilentlyContinue)
+        if ($createdFiles -notcontains $Source) {
+            [System.IO.File]::AppendAllText($script:CreatedFilesList, $Source + [Environment]::NewLine, [System.Text.Encoding]::UTF8)
+        }
     }
 }
 
@@ -160,7 +163,7 @@ try {
 
     Say-B64 '5a6J6KOF5YmN5bey5aSH5Lu95YiwOg=='
     Say-Path $script:BackupDir
-    $script:CreatedFilesList = Join-Path $script:BackupDir '.created-files'
+    $script:CreatedFilesList = Join-Path $script:BackupDir 'created-files.txt'
     Set-Content -LiteralPath $script:CreatedFilesList -Value '' -Encoding UTF8
 
     Backup-ExistingFile (Join-Path $script:ProfilesDir 'Merge.yaml') 'Merge.yaml'
@@ -170,8 +173,6 @@ try {
 
     Say-B64 '5q2j5Zyo5a6J6KOFLi4u'
     $script:InstallStarted = $true
-    Copy-Required (Join-Path $configDir 'Merge.yaml') (Join-Path $script:ProfilesDir 'Merge.yaml')
-    Copy-Required (Join-Path $configDir 'Script.js') (Join-Path $script:ProfilesDir 'Script.js')
 
     $syncScript = Join-Path $scriptDir 'sync-profile-bound-files.ps1'
     if (-not (Test-Path -LiteralPath $syncScript)) {
@@ -191,20 +192,28 @@ try {
     Remove-Item Env:\SYNC_CONFIG_DIR -ErrorAction SilentlyContinue
     Remove-Item Env:\SYNC_BACKUP_DIR -ErrorAction SilentlyContinue
 
+    Copy-Required (Join-Path $configDir 'Merge.yaml') (Join-Path $script:ProfilesDir 'Merge.yaml')
+    Copy-Required (Join-Path $configDir 'Script.js') (Join-Path $script:ProfilesDir 'Script.js')
     Copy-Required (Join-Path $configDir 'verge.yaml') (Join-Path $script:ClashDir 'verge.yaml')
     Copy-Required (Join-Path $configDir 'dns_config.yaml') (Join-Path $script:ClashDir 'dns_config.yaml')
 
     $script:InstallCompleted = $true
     $oldBackups = Get-ChildItem -LiteralPath $script:ClashDir -Directory -Filter 'backup_*' -ErrorAction SilentlyContinue |
+        Where-Object { $_.Name -match '^backup_[0-9]{8}_[0-9]{6}_[A-Za-z0-9]{6,8}$' } |
         Sort-Object Name -Descending |
         Select-Object -Skip 5
     $cleanupCount = 0
     foreach ($backup in $oldBackups) {
-        Remove-Item -LiteralPath $backup.FullName -Recurse -Force -ErrorAction SilentlyContinue
-        $cleanupCount += 1
+        try {
+            Remove-Item -LiteralPath $backup.FullName -Recurse -Force -ErrorAction Stop
+            $cleanupCount += 1
+        } catch {
+            Say-B64 '6K2m5ZGKOiDml6Dms5XmuIXnkIbml6fnmoToh6rliqjlpIfku706'
+            Say-Path $backup.FullName
+        }
     }
     if ($cleanupCount -gt 0) {
-        Say-B64 '5bey5riF55CG5pen5aSH5Lu977yM5LuF5L+d55WZ5pyA6L+RIDUg5LiqIGJhY2t1cF8qIOebruW9leOAgg=='
+        Say-B64 '5bey5riF55CG5a6J6KOF5Zmo5pen5aSH5Lu977yM5LuF5L+d55WZ5pyA6L+RIDUg5Liq6Ieq5Yqo5aSH5Lu955uu5b2V77yb5omL5bel5aSH5Lu95LiN5Lya5Yig6Zmk44CC'
     }
 
     Write-Host ''
@@ -216,6 +225,10 @@ try {
     Say-B64 'ICAxLiDph43mlrDmiZPlvIAgQ2xhc2ggVmVyZ2UgUmV244CC'
     Say-B64 'ICAyLiDlnKjku6PnkIbpobXnoa7orqTog73nnIvliLDov5nkupvliIbnu4Q6'
     Write-Host '  Claude / AI / Google / YouTube / Telegram / Exchange / US / TW / SG / HK / JP / Proxies'
+    $createdEntries = @(Get-Content -LiteralPath $script:CreatedFilesList -Encoding UTF8 | Where-Object { -not [string]::IsNullOrWhiteSpace($_) })
+    if ($createdEntries.Count -gt 0) {
+        Say-B64 '5o+Q56S6OiBjcmVhdGVkLWZpbGVzLnR4dCDph4zliJflh7rnmoTmlofku7blnKjlronoo4XliY3kuI3lrZjlnKjvvJvnsr7noa7ov5jljp/ml7bpnIDopoHliKDpmaTlroPku6zjgII='
+    }
     Say-B64 'ICAzLiDmjIkgUkVBRE1FLnR4dCDnmoTigJzlronoo4XlkI4gNjAg56eS5qOA5p+l5riF5Y2V4oCd5rWL6K+V44CC'
     Say-B64 '5aaC5p6c5p+Q57G7572R56uZ5byC5bi477yM5YWI5YiH5o2i5a+55bqU562W55Wl57uE6IqC54K544CC'
     exit 0

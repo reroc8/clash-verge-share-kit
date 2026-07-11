@@ -5,12 +5,12 @@
 核心策略：
 
 - `Claude`：Claude / Anthropic 独立组，只保留 `US`。
-- `AI`：OpenAI、Gemini、Copilot、Cursor、Perplexity 等国际 AI 服务，只保留 `US / TW` 两个地区组；默认优先 US。
+- `AI`：OpenAI、Gemini、Copilot、Cursor、Perplexity 等国际 AI 服务，只保留 `US / TW` 两个地区组；默认优先 US。OpenAI 专用静态与状态域名一并进入该组，减少同一会话落入普通 `Proxies` 的出口拆分。
 - `Google`：Google 账号、登录、OAuth、支付入口和 Google 生态。
 - `YouTube`：`youtube.com`、`youtu.be`、`youtube-nocookie.com`、`youtubeeducation.com`、`youtubegaming.com`、`youtubekids.com`、`googlevideo.com`、`ytimg.com`、`youtubei.googleapis.com`、`yt3.ggpht.com` 等视频、图片、嵌入播放器和儿童/教育子产品域名。
-- `Exchange`：OKX、Bybit、Binance、Bitget、Gate、KuCoin、MEXC、Crypto.com、Coinbase、Kraken、HTX、BingX、BitMart、Bitfinex、Bitstamp、Upbit 等交易所域名。
+- `Exchange`：OKX、Bybit、Binance、Bitget、Gate、KuCoin、MEXC、Crypto.com、Coinbase、Kraken、HTX、BingX、BitMart、Bitfinex、Bitstamp、Upbit 等交易所主域名、静态资源域名和 HTTPDNS 辅助域名。
 - `DIRECT`：局域网、国内 IP、钉钉、常规 Apple/iCloud、DeepSeek、Kimi、豆包、通义、文心、腾讯元宝、智谱、MiniMax 等中国大陆 AI。
-- `Proxies`：明确海外规则命中的普通代理；如果订阅里已有 `proxies` / `PROXIES` 等大小写变体，会复用原组名并自动改写规则目标，避免出现两个相似组。
+- `Proxies`：明确海外规则命中的普通代理；如果订阅里已有 `proxies` / `PROXIES` 等大小写变体，会复用原组名并自动改写规则目标。节点名与固定组名冲突时，自动组使用 `US Group` 等备用名，避免代理组循环。
 
 代理页显示顺序固定为：
 
@@ -46,6 +46,8 @@ Claude / AI / Google / YouTube / Telegram / Exchange / US / TW / SG / HK / JP / 
 - 安装脚本不再要求订阅必须有固定策略组名。
 - 安装脚本会同步 `profiles.yaml` 中已有订阅绑定的 merge/script 文件，避免当前订阅继续使用旧脚本。
 - `Script.js` 会自动补齐 `Proxies / Claude / AI / US / Google / YouTube / Telegram / Exchange`；如果已有大小写不同的同名组，会复用已有组名并改写规则目标。
+- 纯内联节点订阅会压缩原始策略组；存在 `proxy-providers` 的纯 provider 或混合订阅会保留原始 provider 组，避免节点入口丢失。
+- 远程规则集显式通过 `Proxies` 下载，降低新机器首次启动时直连 GitHub Raw 失败的概率。
 - `Claude` 组会被强制更新为仅包含 `US`，用于降低 Claude 出口地区变化。
 - `AI` 组会被强制更新为仅包含 `US / TW`，用于降低国际 AI 服务出口地区变化；中国大陆 AI 不进入该组。
 - `Exchange` 组会被强制更新为仅包含 `TW / SG`，用于降低交易所登录出口地区变化。

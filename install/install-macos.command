@@ -21,12 +21,27 @@ for version_file in "$SCRIPT_DIR/VERSION.txt" "$SCRIPT_DIR/../VERSION.txt"; do
 done
 
 cleanup_old_backups() {
-    old_backups="$(find "$CLASH_DIR" -maxdepth 1 -type d -name 'backup_*' -print 2>/dev/null | sort -r | awk 'NR > 5')"
+    installer_backups="$(
+        while IFS= read -r backup_path; do
+            backup_name="$(basename "$backup_path")"
+            if [[ "$backup_name" =~ ^backup_[0-9]{8}_[0-9]{6}_[A-Za-z0-9]{6,8}$ ]]; then
+                printf '%s\n' "$backup_path"
+            fi
+        done < <(find "$CLASH_DIR" -maxdepth 1 -type d -name 'backup_*' -print 2>/dev/null)
+    )"
+    old_backups="$(printf '%s\n' "$installer_backups" | sort -r | awk 'NF && NR > 5')"
     if [ -n "$old_backups" ]; then
-        echo "$old_backups" | while IFS= read -r old_backup; do
-            rm -rf "$old_backup"
-        done
-        echo ">>> 已清理旧备份，仅保留最近 5 个 backup_* 目录"
+        cleanup_count=0
+        while IFS= read -r old_backup; do
+            if rm -rf "$old_backup"; then
+                cleanup_count=$((cleanup_count + 1))
+            else
+                echo "警告: 无法清理旧的自动备份: $old_backup"
+            fi
+        done <<< "$old_backups"
+        if [ "$cleanup_count" -gt 0 ]; then
+            echo ">>> 已清理安装器旧备份，仅保留最近 5 个自动备份目录；手工备份不会删除"
+        fi
     fi
 }
 
@@ -45,7 +60,9 @@ backup_existing_file() {
             cp "$src" "$BACKUP_DIR/$backup_name"
         fi
     elif [ -n "${CREATED_FILES_LIST:-}" ]; then
-        printf '%s\n' "$src" >> "$CREATED_FILES_LIST"
+        if ! grep -Fqx -- "$src" "$CREATED_FILES_LIST" 2>/dev/null; then
+            printf '%s\n' "$src" >> "$CREATED_FILES_LIST"
+        fi
     fi
 }
 
@@ -75,6 +92,9 @@ restore_from_backup() {
         [ -f "$backup_file" ] || continue
         file_name="$(basename "$backup_file")"
         case "$file_name" in
+            created-files.txt)
+                continue
+                ;;
             verge.yaml|dns_config.yaml)
                 restore_path="$CLASH_DIR/$file_name"
                 ;;
@@ -108,17 +128,25 @@ sync_profile_bound_files() {
     [ -f "$profiles_yaml" ] || return 0
 
     awk '
-        /^- uid:/ { item_type = "" }
+        /^[[:space:]]*- uid:/ { item_type = "" }
         /^[[:space:]]*type:[[:space:]]*(merge|script)[[:space:]]*$/ { item_type = $2 }
         /^[[:space:]]*file:[[:space:]]*/ {
-            file = $2
-            gsub(/"/, "", file)
-            gsub(/'"'"'/, "", file)
+            file = $0
+            sub(/^[[:space:]]*file:[[:space:]]*/, "", file)
+            sub(/[[:space:]]*$/, "", file)
+            if (file ~ /^".*"$/) {
+                sub(/^"/, "", file)
+                sub(/"$/, "", file)
+            }
+            if (file ~ /^\047.*\047$/) {
+                sub(/^\047/, "", file)
+                sub(/\047$/, "", file)
+            }
             if (item_type == "merge" || item_type == "script") {
-                print item_type " " file
+                print item_type "\t" file
             }
         }
-    ' "$profiles_yaml" | while IFS=' ' read -r item_type file_name; do
+    ' "$profiles_yaml" | while IFS=$'\t' read -r item_type file_name; do
         case "$file_name" in
             ""|/*|*..*|*\\*) continue ;;
         esac
@@ -166,7 +194,7 @@ fi
 mkdir -p "$CLASH_DIR/profiles"
 
 BACKUP_DIR="$(mktemp -d "$CLASH_DIR/backup_${BACKUP_STAMP}_XXXXXX")"
-CREATED_FILES_LIST="$BACKUP_DIR/.created-files"
+CREATED_FILES_LIST="$BACKUP_DIR/created-files.txt"
 : > "$CREATED_FILES_LIST"
 
 echo ">>> 安装前备份到: $BACKUP_DIR"
@@ -181,9 +209,9 @@ done
 
 echo ">>> 正在安装..."
 INSTALL_STARTED=1
+sync_profile_bound_files
 cp "$CONFIG_DIR/Merge.yaml"       "$CLASH_DIR/profiles/Merge.yaml"
 cp "$CONFIG_DIR/Script.js"        "$CLASH_DIR/profiles/Script.js"
-sync_profile_bound_files
 cp "$CONFIG_DIR/verge.yaml"       "$CLASH_DIR/verge.yaml"
 cp "$CONFIG_DIR/dns_config.yaml"  "$CLASH_DIR/dns_config.yaml"
 INSTALL_COMPLETED=1
@@ -198,7 +226,10 @@ echo ">>>   Merge.yaml / Script.js / 其它随机 .yaml .js -> $CLASH_DIR/profil
 echo ">>>   verge.yaml / dns_config.yaml -> $CLASH_DIR/"
 echo ">>> 配置文件已写入，并已同步已有订阅绑定的 merge/script 文件"
 echo ">>> 重新打开 Clash Verge Rev 后即生效"
-echo ">>> 安装后确认: 代理页能看到 Claude / AI / US / Google / YouTube / Exchange"
+echo ">>> 安装后确认: 代理页能看到 Claude / AI / Google / YouTube / Telegram / Exchange / US / TW / SG / HK / JP / Proxies"
+if [ -s "$CREATED_FILES_LIST" ]; then
+    echo ">>> 提示: created-files.txt 里列出的文件在安装前不存在；精确还原时需要删除它们"
+fi
 echo ">>> 如果某类网站异常，先换对应策略组节点；如果规则集下载失败，请查看 Clash Verge Rev 日志"
 echo ">>> 也可以按 README.txt 的“安装后 60 秒检查清单”逐项测试"
 pause_before_close

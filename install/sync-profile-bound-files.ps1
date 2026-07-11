@@ -31,7 +31,7 @@ try {
     Require-Directory 'profiles' $profiles
 
     $profilesYaml = Join-Path $ClashDir 'profiles.yaml'
-    $createdFilesList = Join-Path $BackupDir '.created-files'
+    $createdFilesList = Join-Path $BackupDir 'created-files.txt'
 
     if (-not (Test-Path -LiteralPath $profilesYaml)) {
         Write-Host 'profiles.yaml not found; skip profile-bound file sync'
@@ -68,7 +68,10 @@ try {
                     Copy-Item -LiteralPath $dst -Destination $backupDst -Force -ErrorAction Stop
                 }
             } else {
-                [System.IO.File]::AppendAllText($createdFilesList, $dst + [Environment]::NewLine, [System.Text.Encoding]::UTF8)
+                $createdFiles = @(Get-Content -LiteralPath $createdFilesList -Encoding UTF8 -ErrorAction SilentlyContinue)
+                if ($createdFiles -notcontains $dst) {
+                    [System.IO.File]::AppendAllText($createdFilesList, $dst + [Environment]::NewLine, [System.Text.Encoding]::UTF8)
+                }
             }
 
             if ($script:ItemType -eq 'merge') {

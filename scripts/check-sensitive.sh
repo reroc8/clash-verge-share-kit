@@ -2,17 +2,25 @@
 set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
-TMP_FILE="${TMPDIR:-/tmp}/clash-verge-share-kit-sensitive.txt"
+TMP_FILE="$(mktemp "${TMPDIR:-/tmp}/clash-verge-share-kit-sensitive.XXXXXX")"
+trap 'rm -f "$TMP_FILE"' EXIT
 
 SENSITIVE_PATTERN='(^[[:space:]]*(proxies|proxy-providers):[[:space:]]*$|^[[:space:]-]*(server|password|uuid|cipher|alterId|client-fingerprint|private-key|servername|sni|skip-cert-verify):[[:space:]]*|https?://[^[:space:]"]*(token=|subscribe|subscription|api/v1/client/subscribe|api/v1/passport/auth/subscribe))'
-SCAN_TARGETS=(
-    "$ROOT_DIR/config"
-    "$ROOT_DIR/install"
-    "$ROOT_DIR/scripts"
-    "$ROOT_DIR/README.md"
-    "$ROOT_DIR/SECURITY.md"
-    "$ROOT_DIR/docs"
-)
+if [ "$#" -gt 0 ]; then
+    SCAN_TARGETS=("$@")
+else
+    SCAN_TARGETS=(
+        "$ROOT_DIR/config"
+        "$ROOT_DIR/install"
+        "$ROOT_DIR/scripts"
+        "$ROOT_DIR/tests"
+        "$ROOT_DIR/README.md"
+        "$ROOT_DIR/CHANGELOG.md"
+        "$ROOT_DIR/SECURITY.md"
+        "$ROOT_DIR/VERSION.txt"
+        "$ROOT_DIR/docs"
+    )
+fi
 
 if command -v rg >/dev/null 2>&1; then
     SCAN_TOOL="rg"
@@ -41,5 +49,4 @@ if [ "$STATUS" -ne 1 ]; then
     exit "$STATUS"
 fi
 
-rm -f "$TMP_FILE"
 echo "敏感信息扫描通过: 使用 $SCAN_TOOL"

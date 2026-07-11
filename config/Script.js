@@ -2,6 +2,8 @@ function main(config, profileName) {
   var groupNames = {};
   var groupNameByLower = {};
   var proxyNames = {};
+  var proxyNameByLower = {};
+  var managedGroupNameByPreferred = {};
 
   function normalizeName(name) {
     return String(name || "").toLowerCase();
@@ -38,6 +40,7 @@ function main(config, profileName) {
     if (rawProxies[p] && rawProxies[p].name) {
       proxies.push(rawProxies[p]);
       proxyNames[rawProxies[p].name] = true;
+      proxyNameByLower[normalizeName(rawProxies[p].name)] = rawProxies[p].name;
     }
   }
   config.proxies = proxies;
@@ -89,27 +92,90 @@ function main(config, profileName) {
     return null;
   }
 
-  function ensureGroup(name, options) {
-    var existingName = findExistingGroup(name);
-    if (existingName) {
-      return existingName;
+  function findGroupByExactName(name) {
+    for (var i = 0; i < groups.length; i++) {
+      if (groups[i] && groups[i].name === name) {
+        return groups[i];
+      }
     }
+    return null;
+  }
+
+  function proxyNameExists(name) {
+    return !!proxyNameByLower[normalizeName(name)];
+  }
+
+  function allocateGroupName(preferredName) {
+    if (!proxyNameExists(preferredName) && !findExistingGroup(preferredName)) {
+      return preferredName;
+    }
+
+    var baseName = preferredName + " Group";
+    var candidate = baseName;
+    var suffix = 2;
+    while (proxyNameExists(candidate) || findExistingGroup(candidate)) {
+      candidate = baseName + " " + suffix;
+      suffix += 1;
+    }
+    return candidate;
+  }
+
+  function findManagedGroup(preferredName) {
+    var allocatedName = managedGroupNameByPreferred[preferredName];
+    if (allocatedName) {
+      return findGroupByExactName(allocatedName);
+    }
+
+    var existingGroup = findGroup(preferredName);
+    if (existingGroup && !proxyNameExists(existingGroup.name)) {
+      managedGroupNameByPreferred[preferredName] = existingGroup.name;
+      return existingGroup;
+    }
+
+    var baseName = preferredName + " Group";
+    for (var suffix = 1; suffix < 100; suffix++) {
+      var candidate = suffix === 1 ? baseName : baseName + " " + suffix;
+      var fallbackGroup = findGroup(candidate);
+      if (fallbackGroup && !proxyNameExists(fallbackGroup.name)) {
+        managedGroupNameByPreferred[preferredName] = fallbackGroup.name;
+        return fallbackGroup;
+      }
+      if (!fallbackGroup && !proxyNameExists(candidate)) {
+        break;
+      }
+    }
+
+    return null;
+  }
+
+  function ensureGroup(name, options) {
+    var finalName = allocateGroupName(name);
     var finalOptions = filterExisting(options);
     if (finalOptions.length === 0) {
       finalOptions = ["DIRECT"];
     }
     groups.push({
-      name: name,
+      name: finalName,
       type: "select",
       proxies: finalOptions
     });
-    rememberGroupName(name);
-    return name;
+    rememberGroupName(finalName);
+    managedGroupNameByPreferred[name] = finalName;
+    return finalName;
   }
 
   function ensureManagedGroup(name, options, fallbackOptions) {
-    var existingGroup = findGroup(name);
+    var existingGroup = findManagedGroup(name);
     var finalOptions = filterExisting(options);
+    if (existingGroup) {
+      var withoutSelf = [];
+      for (var optionIndex = 0; optionIndex < finalOptions.length; optionIndex++) {
+        if (finalOptions[optionIndex] !== existingGroup.name) {
+          withoutSelf.push(finalOptions[optionIndex]);
+        }
+      }
+      finalOptions = withoutSelf;
+    }
     if (finalOptions.length === 0) {
       finalOptions = filterExisting(fallbackOptions || ["DIRECT"]);
     }
@@ -117,6 +183,25 @@ function main(config, profileName) {
       finalOptions = ["DIRECT"];
     }
     if (existingGroup) {
+      var dynamicOptionKeys = [
+        "use",
+        "filter",
+        "exclude-filter",
+        "exclude-type",
+        "include-all",
+        "include-all-proxies",
+        "include-all-providers",
+        "url",
+        "interval",
+        "timeout",
+        "tolerance",
+        "lazy",
+        "expected-status",
+        "max-failed-times"
+      ];
+      for (var dynamicKeyIndex = 0; dynamicKeyIndex < dynamicOptionKeys.length; dynamicKeyIndex++) {
+        delete existingGroup[dynamicOptionKeys[dynamicKeyIndex]];
+      }
       existingGroup.type = "select";
       existingGroup.proxies = finalOptions;
       return existingGroup.name;
@@ -142,7 +227,17 @@ function main(config, profileName) {
   for (var pr = 0; pr < proxies.length; pr++) {
     originalProxies.push(proxies[pr].name);
   }
-  var compactGroupsEnabled = originalProxies.length > 0;
+  var proxyProviders = config["proxy-providers"];
+  var hasProxyProviders = false;
+  if (proxyProviders && typeof proxyProviders === "object") {
+    for (var providerName in proxyProviders) {
+      if (proxyProviders.hasOwnProperty(providerName)) {
+        hasProxyProviders = true;
+        break;
+      }
+    }
+  }
+  var compactGroupsEnabled = originalProxies.length > 0 && !hasProxyProviders;
 
   var preferredGeneralGroups = [
     "节点选择",
@@ -170,7 +265,13 @@ function main(config, profileName) {
   }
   generalOptions = generalOptions.concat(originalProxies).concat(["DIRECT"]);
 
-  var PROXIES_GROUP = ensureManagedGroup("Proxies", generalOptions, ["DIRECT"]);
+  var existingProxiesGroup = !compactGroupsEnabled ? findManagedGroup("Proxies") : null;
+  var PROXIES_GROUP;
+  if (existingProxiesGroup) {
+    PROXIES_GROUP = existingProxiesGroup.name;
+  } else {
+    PROXIES_GROUP = ensureManagedGroup("Proxies", generalOptions, ["DIRECT"]);
+  }
 
   var regionPatterns = {
     HK: [/香港/i, /Hong Kong/i, /(^|[^A-Za-z])HK([^A-Za-z]|$)/i, /🇭🇰/],
@@ -206,7 +307,12 @@ function main(config, profileName) {
 
     if (regionOptions.length > 0) {
       detectedRegions[region] = true;
-      managedGroups[region] = ensureManagedGroup(region, regionOptions, ["DIRECT"]);
+      var existingRegionGroup = !compactGroupsEnabled ? findManagedGroup(region) : null;
+      if (existingRegionGroup && regionOptions.indexOf(existingRegionGroup.name) !== -1) {
+        managedGroups[region] = existingRegionGroup.name;
+      } else {
+        managedGroups[region] = ensureManagedGroup(region, regionOptions, ["DIRECT"]);
+      }
     }
   }
 
@@ -229,6 +335,18 @@ function main(config, profileName) {
   for (var managedName in managedGroups) {
     if (managedGroups.hasOwnProperty(managedName)) {
       managedTargetMap[managedName] = managedGroups[managedName];
+    }
+  }
+
+  if (ruleProviders && typeof ruleProviders === "object") {
+    for (var ruleProviderName in ruleProviders) {
+      if (!ruleProviders.hasOwnProperty(ruleProviderName)) {
+        continue;
+      }
+      var ruleProvider = ruleProviders[ruleProviderName];
+      if (ruleProvider && managedTargetMap[ruleProvider.proxy]) {
+        ruleProvider.proxy = managedTargetMap[ruleProvider.proxy];
+      }
     }
   }
 
@@ -293,38 +411,80 @@ function main(config, profileName) {
 
   config["proxy-groups"] = groups;
 
+  function splitRuleParts(rule) {
+    var parts = [];
+    var current = "";
+    var depth = 0;
+    for (var i = 0; i < rule.length; i++) {
+      var character = rule.charAt(i);
+      if (character === "(") {
+        depth += 1;
+      } else if (character === ")" && depth > 0) {
+        depth -= 1;
+      }
+      if (character === "," && depth === 0) {
+        parts.push(current);
+        current = "";
+      } else {
+        current += character;
+      }
+    }
+    parts.push(current);
+    return parts;
+  }
+
   function rewriteRuleTarget(rule) {
-    if (typeof rule !== "string" || rule.indexOf("(") !== -1) {
+    if (typeof rule !== "string") {
       return rule;
     }
-    var parts = rule.split(",");
+    var parts = splitRuleParts(rule);
     if (parts.length < 2) {
       return rule;
     }
-    var targetIndex = parts[0] === "MATCH" ? 1 : 2;
+    var ruleType = String(parts[0] || "").toUpperCase();
+    var changed = false;
+    if (ruleType === "FINAL") {
+      parts[0] = "MATCH";
+      ruleType = "MATCH";
+      changed = true;
+    }
+    var targetIndex = ruleType === "MATCH" ? 1 : 2;
     if (parts.length > targetIndex && managedTargetMap[parts[targetIndex]]) {
       parts[targetIndex] = managedTargetMap[parts[targetIndex]];
-      return parts.join(",");
+      changed = true;
     }
-    return rule;
+    return changed ? parts.join(",") : rule;
   }
 
   var exchangeDomains = [
     "okx.com",
     "okx-dns.com",
+    "okx-httpdns.com",
     "okex.com",
+    "okex.org",
     "oklink.com",
+    "okx.cab",
+    "coinall.ltd",
+    "ouxyi.cash",
     "bybit.com",
     "bybitglobal.com",
     "bybit.cloud",
     "bycsi.com",
     "bytick.com",
     "binance.com",
+    "binance.cloud",
+    "binancefuture.com",
     "binance.info",
     "binance.me",
     "binance.us",
     "binancecnt.com",
+    "bnappzh.co",
     "bnbstatic.com",
+    "bnbzh.ac",
+    "bntrace.com",
+    "saasexch.cc",
+    "saasexch.com",
+    "binance.vision",
     "bitget.com",
     "bitgetimg.com",
     "bitgetstatic.com",
@@ -358,23 +518,23 @@ function main(config, profileName) {
   }
 
   function isManagedExchangeRule(rule) {
-    if (typeof rule !== "string" || rule.indexOf("(") !== -1) {
+    if (typeof rule !== "string") {
       return false;
     }
-    var parts = rule.split(",");
+    var parts = splitRuleParts(rule);
     return parts[0] === "DOMAIN-SUFFIX" && exchangeDomainSet[parts[1]] === true;
   }
 
   function isRejectRule(rule) {
-    if (typeof rule !== "string" || rule.indexOf("(") !== -1) {
+    if (typeof rule !== "string") {
       return false;
     }
-    var parts = rule.split(",");
+    var parts = splitRuleParts(rule);
     if (parts.length < 2) {
       return false;
     }
     var type = String(parts[0] || "").toUpperCase();
-    var targetIndex = type === "MATCH" ? 1 : 2;
+    var targetIndex = type === "MATCH" || type === "FINAL" ? 1 : 2;
     var providerName = String(parts[1] || "").toLowerCase();
     var target = String(parts[targetIndex] || "").toUpperCase();
     return target === "REJECT" || (type === "RULE-SET" && providerName === "reject");

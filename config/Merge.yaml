@@ -11,78 +11,91 @@ rule-providers:
     url: "https://raw.githubusercontent.com/Loyalsoldier/clash-rules/release/proxy.txt"
     path: ./ruleset/proxy.yaml
     interval: 86400
+    proxy: Proxies
   direct:
     type: http
     behavior: domain
     url: "https://raw.githubusercontent.com/Loyalsoldier/clash-rules/release/direct.txt"
     path: ./ruleset/direct.yaml
     interval: 86400
+    proxy: Proxies
   gfw:
     type: http
     behavior: domain
     url: "https://raw.githubusercontent.com/Loyalsoldier/clash-rules/release/gfw.txt"
     path: ./ruleset/gfw.yaml
     interval: 86400
+    proxy: Proxies
   greatfire:
     type: http
     behavior: domain
     url: "https://raw.githubusercontent.com/Loyalsoldier/clash-rules/release/greatfire.txt"
     path: ./ruleset/greatfire.yaml
     interval: 86400
+    proxy: Proxies
   tld-not-cn:
     type: http
     behavior: domain
     url: "https://raw.githubusercontent.com/Loyalsoldier/clash-rules/release/tld-not-cn.txt"
     path: ./ruleset/tld-not-cn.yaml
     interval: 86400
+    proxy: Proxies
   google:
     type: http
     behavior: domain
     url: "https://raw.githubusercontent.com/Loyalsoldier/clash-rules/release/google.txt"
     path: ./ruleset/google.yaml
     interval: 86400
+    proxy: Proxies
   telegramcidr:
     type: http
     behavior: ipcidr
     url: "https://raw.githubusercontent.com/Loyalsoldier/clash-rules/release/telegramcidr.txt"
     path: ./ruleset/telegramcidr.yaml
     interval: 86400
+    proxy: Proxies
   apple:
     type: http
     behavior: domain
     url: "https://raw.githubusercontent.com/Loyalsoldier/clash-rules/release/apple.txt"
     path: ./ruleset/apple.yaml
     interval: 86400
+    proxy: Proxies
   icloud:
     type: http
     behavior: domain
     url: "https://raw.githubusercontent.com/Loyalsoldier/clash-rules/release/icloud.txt"
     path: ./ruleset/icloud.yaml
     interval: 86400
+    proxy: Proxies
   private:
     type: http
     behavior: domain
     url: "https://raw.githubusercontent.com/Loyalsoldier/clash-rules/release/private.txt"
     path: ./ruleset/private.yaml
     interval: 86400
+    proxy: Proxies
   lancidr:
     type: http
     behavior: ipcidr
     url: "https://raw.githubusercontent.com/Loyalsoldier/clash-rules/release/lancidr.txt"
     path: ./ruleset/lancidr.yaml
     interval: 86400
+    proxy: Proxies
   cncidr:
     type: http
     behavior: ipcidr
     url: "https://raw.githubusercontent.com/Loyalsoldier/clash-rules/release/cncidr.txt"
     path: ./ruleset/cncidr.yaml
     interval: 86400
+    proxy: Proxies
   applications:
     type: http
     behavior: classical
     url: "https://raw.githubusercontent.com/Loyalsoldier/clash-rules/release/applications.txt"
     path: ./ruleset/applications.yaml
     interval: 86400
+    proxy: Proxies
 
 # ── 分流规则 ──
 rules:
@@ -109,6 +122,8 @@ rules:
   - DOMAIN-SUFFIX,openai.com,AI
   - DOMAIN-SUFFIX,oaistatic.com,AI
   - DOMAIN-SUFFIX,oaiusercontent.com,AI
+  - DOMAIN-SUFFIX,oaistatsig.com,AI
+  - DOMAIN-SUFFIX,openaimerge.com,AI
   - DOMAIN-SUFFIX,openaiapi-site.azureedge.net,AI
   - DOMAIN-SUFFIX,gemini.google.com,AI
   - DOMAIN-SUFFIX,bard.google.com,AI
