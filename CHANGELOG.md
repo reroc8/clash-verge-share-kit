@@ -1,5 +1,16 @@
 # Changelog
 
+## Unreleased
+
+## v0.3.17
+
+- 本机候选测试：通用国内/私网基础规则改用 DustinWin MRS，通用海外域名改用 blackmatrix7 Global_Domain；保留专用业务规则和最终 `MATCH,DIRECT`。
+- Google 基础规则改用 blackmatrix7 Google，补齐 Gmail 与通用 Google 域名，专用 Gemini / YouTube 规则继续优先匹配。
+- 补齐 Claude 内容与 MCP、Codex/OpenAI CDN、Gemini/NotebookLM 专用端点，避免严格业务流量落入普通 `Proxies` 或共享 `Google` 组。
+- 补充 OKX、Bybit、Binance 关联域名，继续限制交易所流量只使用 `TW / SG`。
+- 将 `applications,DIRECT` 调整到业务规则之后、CN/Global 基础层之前，避免通用海外域名规则抢走应用直连流量。
+- 增加严格业务域名与规则顺序回归测试，并同步更新路由设计文档。
+
 ## v0.3.16
 
 - 修复节点名恰好为 `US / TW / Proxies` 等固定组名时，自动策略组形成同名循环并导致 Mihomo 拒绝启动的问题。
