@@ -33,7 +33,7 @@ Claude / AI / Google / YouTube / Telegram / Exchange / US / TW / SG / HK / JP / 
 
 最终兜底：
 
-最终规则使用 `MATCH,DIRECT`，不是 `MATCH,Proxies`。原因是国内很多小站是 `.com`，不一定会命中 `direct` 规则集；如果未知域名默认走代理，节点或上游可能返回 502。当前设计把国际 AI、Google、YouTube、Telegram、交易所、GFW、非 CN TLD、Loyalsoldier proxy 等明确海外流量提前代理；中国大陆 AI、国内网站和剩余未知流量默认直连，优先保证国内网站和小白用户日常访问稳定。大陆 AI 里有不少 `.com`、`.ai`、`.chat` 域名，所以需要放在 `tld-not-cn` 和 `proxy` 规则集前面显式直连。
+最终规则使用 `MATCH,DIRECT`，不是 `MATCH,Proxies`。原因是国内很多小站是 `.com`，不一定会被国内规则集收录；如果未知域名默认走代理，节点或上游可能返回 502。当前设计先处理 Claude、国际 AI、Google、YouTube、Telegram 和交易所等专用业务规则，再处理应用直连；DustinWin MRS 负责私网、国内域名、国内 IP 和国外顶级域名，blackmatrix7 Global_Domain 负责常见海外域名补漏。中国大陆 AI、国内网站和剩余未知流量默认直连，优先保证国内网站和小白用户日常访问稳定。
 
 这个取舍的副作用是：少数没被规则集覆盖的海外冷门网站可能直连失败。遇到这类网站时，应补明确域名规则，而不是把全局兜底改回 `Proxies`。
 

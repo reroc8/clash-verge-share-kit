@@ -5,45 +5,57 @@ profile:
 
 # ── 规则集定义 ──
 rule-providers:
-  proxy:
+  private-domain:
     type: http
     behavior: domain
-    url: "https://raw.githubusercontent.com/Loyalsoldier/clash-rules/release/proxy.txt"
-    path: ./ruleset/proxy.yaml
+    format: mrs
+    url: "https://github.com/DustinWin/ruleset_geodata/releases/download/mihomo-ruleset/private.mrs"
+    path: ./ruleset/private-domain.mrs
     interval: 86400
     proxy: Proxies
-  direct:
+  private-ip:
     type: http
-    behavior: domain
-    url: "https://raw.githubusercontent.com/Loyalsoldier/clash-rules/release/direct.txt"
-    path: ./ruleset/direct.yaml
+    behavior: ipcidr
+    format: mrs
+    url: "https://github.com/DustinWin/ruleset_geodata/releases/download/mihomo-ruleset/privateip.mrs"
+    path: ./ruleset/private-ip.mrs
     interval: 86400
     proxy: Proxies
-  gfw:
+  cn-domain:
     type: http
     behavior: domain
-    url: "https://raw.githubusercontent.com/Loyalsoldier/clash-rules/release/gfw.txt"
-    path: ./ruleset/gfw.yaml
+    format: mrs
+    url: "https://github.com/DustinWin/ruleset_geodata/releases/download/mihomo-ruleset/cn.mrs"
+    path: ./ruleset/cn-domain.mrs
     interval: 86400
     proxy: Proxies
-  greatfire:
+  cn-ip:
     type: http
-    behavior: domain
-    url: "https://raw.githubusercontent.com/Loyalsoldier/clash-rules/release/greatfire.txt"
-    path: ./ruleset/greatfire.yaml
+    behavior: ipcidr
+    format: mrs
+    url: "https://github.com/DustinWin/ruleset_geodata/releases/download/mihomo-ruleset/cnip.mrs"
+    path: ./ruleset/cn-ip.mrs
     interval: 86400
     proxy: Proxies
-  tld-not-cn:
+  tld-proxy:
     type: http
     behavior: domain
-    url: "https://raw.githubusercontent.com/Loyalsoldier/clash-rules/release/tld-not-cn.txt"
-    path: ./ruleset/tld-not-cn.yaml
+    format: mrs
+    url: "https://github.com/DustinWin/ruleset_geodata/releases/download/mihomo-ruleset/tld-proxy.mrs"
+    path: ./ruleset/tld-proxy.mrs
+    interval: 86400
+    proxy: Proxies
+  global-domain:
+    type: http
+    behavior: domain
+    url: "https://raw.githubusercontent.com/blackmatrix7/ios_rule_script/master/rule/Clash/Global/Global_Domain.yaml"
+    path: ./ruleset/global-domain.yaml
     interval: 86400
     proxy: Proxies
   google:
     type: http
-    behavior: domain
-    url: "https://raw.githubusercontent.com/Loyalsoldier/clash-rules/release/google.txt"
+    behavior: classical
+    url: "https://raw.githubusercontent.com/blackmatrix7/ios_rule_script/master/rule/Clash/Google/Google.yaml"
     path: ./ruleset/google.yaml
     interval: 86400
     proxy: Proxies
@@ -68,27 +80,6 @@ rule-providers:
     path: ./ruleset/icloud.yaml
     interval: 86400
     proxy: Proxies
-  private:
-    type: http
-    behavior: domain
-    url: "https://raw.githubusercontent.com/Loyalsoldier/clash-rules/release/private.txt"
-    path: ./ruleset/private.yaml
-    interval: 86400
-    proxy: Proxies
-  lancidr:
-    type: http
-    behavior: ipcidr
-    url: "https://raw.githubusercontent.com/Loyalsoldier/clash-rules/release/lancidr.txt"
-    path: ./ruleset/lancidr.yaml
-    interval: 86400
-    proxy: Proxies
-  cncidr:
-    type: http
-    behavior: ipcidr
-    url: "https://raw.githubusercontent.com/Loyalsoldier/clash-rules/release/cncidr.txt"
-    path: ./ruleset/cncidr.yaml
-    interval: 86400
-    proxy: Proxies
   applications:
     type: http
     behavior: classical
@@ -100,8 +91,8 @@ rule-providers:
 # ── 分流规则 ──
 rules:
   # 局域网和私有地址直连
-  - RULE-SET,private,DIRECT,no-resolve
-  - RULE-SET,lancidr,DIRECT,no-resolve
+  - RULE-SET,private-domain,DIRECT
+  - RULE-SET,private-ip,DIRECT,no-resolve
   # Google account / auth / billing stay on the stable Google group
   - DOMAIN,accounts.google.com,Google
   - DOMAIN,myaccount.google.com,Google
@@ -114,8 +105,13 @@ rules:
   - DOMAIN-SUFFIX,oauth2.googleapis.com,Google
   - DOMAIN-SUFFIX,oauth2.googleusercontent.com,Google
   # Claude is isolated to a US-only group
+  - DOMAIN,servd-anthropic-website.b-cdn.net,Claude
+  - DOMAIN-SUFFIX,clau.de,Claude
   - DOMAIN-SUFFIX,claude.ai,Claude
   - DOMAIN-SUFFIX,claude.com,Claude
+  - DOMAIN-SUFFIX,claudemcpclient.com,Claude
+  - DOMAIN-SUFFIX,claudemcpcontent.com,Claude
+  - DOMAIN-SUFFIX,claudeusercontent.com,Claude
   - DOMAIN-SUFFIX,anthropic.com,Claude
   # International AI services use a controlled AI group with only US / TW options
   - DOMAIN-SUFFIX,chatgpt.com,AI
@@ -125,6 +121,17 @@ rules:
   - DOMAIN-SUFFIX,oaistatsig.com,AI
   - DOMAIN-SUFFIX,openaimerge.com,AI
   - DOMAIN-SUFFIX,openaiapi-site.azureedge.net,AI
+  # Codex / OpenAI dedicated CDN and storage endpoints. Shared services such as
+  # auth0.com and stripe.com stay out of this list to avoid hijacking other apps.
+  - DOMAIN,openai-api.arkoselabs.com,AI
+  - DOMAIN,openaiassets.blob.core.windows.net,AI
+  - DOMAIN,openaicom-api-bdcpf8c6d2e9atf6.z01.azurefd.net,AI
+  - DOMAIN,openaicomproductionae4b.blob.core.windows.net,AI
+  - DOMAIN,production-openaicom-storage.azureedge.net,AI
+  - DOMAIN-SUFFIX,chat.com,AI
+  - DOMAIN-SUFFIX,chatgpt.livekit.cloud,AI
+  - DOMAIN-SUFFIX,openaicom.imgix.net,AI
+  - DOMAIN-SUFFIX,openai.com.cdn.cloudflare.net,AI
   - DOMAIN-SUFFIX,gemini.google.com,AI
   - DOMAIN-SUFFIX,bard.google.com,AI
   - DOMAIN-SUFFIX,generativelanguage.googleapis.com,AI
@@ -134,6 +141,37 @@ rules:
   - DOMAIN-SUFFIX,notebooklm.google.com,AI
   - DOMAIN-SUFFIX,labs.google,AI
   - DOMAIN-SUFFIX,deepmind.com,AI
+  # Gemini / Google AI endpoints are kept explicit. Do not route broad shared
+  # domains such as apis.google.com through AI because Gmail also uses them.
+  - DOMAIN,alkalicore-pa.clients6.google.com,AI
+  - DOMAIN,alkalimakersuite-pa.clients6.google.com,AI
+  - DOMAIN,antigravity-pa.googleapis.com,AI
+  - DOMAIN,antigravity.googleapis.com,AI
+  - DOMAIN,cloudaicompanion.googleapis.com,AI
+  - DOMAIN,cloudcode-pa.googleapis.com,AI
+  - DOMAIN,daily-cloudcode-pa.googleapis.com,AI
+  - DOMAIN,notebooklm-pa.googleapis.com,AI
+  - DOMAIN,notebooklm.googleapis.com,AI
+  - DOMAIN,webchannel-alkalimakersuite-pa.clients6.google.com,AI
+  - DOMAIN-SUFFIX,aicode.googleapis.com,AI
+  - DOMAIN-SUFFIX,aida.googleapis.com,AI
+  - DOMAIN-SUFFIX,aisandbox-pa.googleapis.com,AI
+  - DOMAIN-SUFFIX,antigravity-unleash.goog,AI
+  - DOMAIN-SUFFIX,antigravity.google,AI
+  - DOMAIN-SUFFIX,deepmind.google,AI
+  - DOMAIN-SUFFIX,gemini.google,AI
+  - DOMAIN-SUFFIX,gemini.gstatic.com,AI
+  - DOMAIN-SUFFIX,generativeai.google,AI
+  - DOMAIN-SUFFIX,geller-pa.googleapis.com,AI
+  - DOMAIN-SUFFIX,jules.google,AI
+  - DOMAIN-SUFFIX,jules.google.com,AI
+  - DOMAIN-SUFFIX,labs.google.com,AI
+  - DOMAIN-SUFFIX,notebooklm.google,AI
+  - DOMAIN-SUFFIX,opal.google,AI
+  - DOMAIN-SUFFIX,opal.google.com,AI
+  - DOMAIN-SUFFIX,proactivebackend-pa.googleapis.com,AI
+  - DOMAIN-SUFFIX,robinfrontend-pa.googleapis.com,AI
+  - DOMAIN-SUFFIX,stitch.withgoogle.com,AI
   - DOMAIN-SUFFIX,perplexity.ai,AI
   - DOMAIN-SUFFIX,pplx.ai,AI
   - DOMAIN-SUFFIX,poe.com,AI
@@ -174,7 +212,7 @@ rules:
   - DOMAIN-SUFFIX,together.ai,AI
   - DOMAIN-SUFFIX,together.xyz,AI
   # Mainland China AI services should stay DIRECT, not use the international AI group.
-  # Some of them use .com / .ai / .chat domains, so they must be placed before tld-not-cn / proxy rules.
+  # Some use .com / .ai / .chat domains, so keep them before the broad global rules.
   - DOMAIN-SUFFIX,deepseek.com,DIRECT
   - DOMAIN-SUFFIX,kimi.ai,DIRECT
   - DOMAIN-SUFFIX,moonshot.cn,DIRECT
@@ -221,8 +259,6 @@ rules:
   # 自定义直连：放在宽泛代理规则前，避免被后续规则集抢先命中
   - DOMAIN,codebuddy.cn,DIRECT
   - DOMAIN,copilot.tencent.com,DIRECT
-  # 国内 IP 直连
-  - RULE-SET,cncidr,DIRECT,no-resolve
   # Apple / iCloud
   # Apple 被墙域名走代理
   - DOMAIN,gateway.icloud.com,Proxies
@@ -246,16 +282,15 @@ rules:
   - RULE-SET,google,Google
   # Telegram
   - RULE-SET,telegramcidr,Telegram,no-resolve
-  # GFW
-  - RULE-SET,gfw,Proxies
-  - RULE-SET,greatfire,Proxies
-  # 非中国大陆顶级域名
-  - RULE-SET,tld-not-cn,Proxies
-  # 代理兜底
-  - RULE-SET,proxy,Proxies
-  # 国内域名直连（置后，确保代理规则集优先匹配）
-  - RULE-SET,direct,DIRECT
-  # 指定应用分流
+  # Business rules stay first. Generic application bypass only runs before the
+  # domestic/global base layers, so AI and exchange routing keep priority.
   - RULE-SET,applications,DIRECT
+  # 国内基础规则优先于通用海外规则，降低国内 .com 小站误走代理的概率
+  - RULE-SET,cn-domain,DIRECT
+  - RULE-SET,cn-ip,DIRECT,no-resolve
+  # 海外域名由 blackmatrix7 Global_Domain 补漏
+  - RULE-SET,global-domain,Proxies
+  # 国外顶级域名
+  - RULE-SET,tld-proxy,Proxies
   # 最终兜底：未知站点直连，避免国内 .com 被误送代理导致 502
   - MATCH,DIRECT

@@ -5,7 +5,9 @@ const vm = require("vm");
 
 const rootDir = path.resolve(__dirname, "..");
 const scriptPath = path.join(rootDir, "config", "Script.js");
+const mergePath = path.join(rootDir, "config", "Merge.yaml");
 const source = fs.readFileSync(scriptPath, "utf8");
+const mergeSource = fs.readFileSync(mergePath, "utf8");
 vm.runInThisContext(source, { filename: "config/Script.js" });
 
 function run(config) {
@@ -110,6 +112,50 @@ function groupByName(config, name) {
   });
 
   assert(output.rules[0].startsWith("DOMAIN-SUFFIX,okx.com,"), "exchange rules must be inserted before narrow-only rules");
+}
+
+{
+  const output = run({
+    proxies: [{ name: "US-A" }, { name: "TW-A" }, { name: "SG-A" }],
+    "proxy-groups": [],
+    rules: [
+      "DOMAIN-SUFFIX,service.example,Proxies",
+      "RULE-SET,cn-domain,DIRECT",
+      "RULE-SET,global-domain,Proxies",
+      "MATCH,DIRECT"
+    ]
+  });
+
+  const exchangeIndex = output.rules.findIndex((rule) => rule.startsWith("DOMAIN-SUFFIX,okx.com,"));
+  const cnIndex = output.rules.indexOf("RULE-SET,cn-domain,DIRECT");
+  assert(exchangeIndex > 0 && exchangeIndex < cnIndex, "exchange rules must stay before the new domestic/global base layers");
+  for (const domain of ["okx-dns1.com", "okx-dns2.com", "bybit-global.com", "binanceapi.com"]) {
+    assert(
+      output.rules.includes(`DOMAIN-SUFFIX,${domain},Exchange`),
+      `${domain} must stay inside the controlled Exchange group`
+    );
+  }
+}
+
+{
+  const requiredBusinessRules = [
+    "DOMAIN-SUFFIX,clau.de,Claude",
+    "DOMAIN-SUFFIX,claudeusercontent.com,Claude",
+    "DOMAIN,openaiassets.blob.core.windows.net,AI",
+    "DOMAIN,notebooklm.googleapis.com,AI",
+    "DOMAIN-SUFFIX,gemini.gstatic.com,AI",
+    "DOMAIN-SUFFIX,generativeai.google,AI"
+  ];
+  for (const rule of requiredBusinessRules) {
+    assert(mergeSource.includes(`- ${rule}`), `${rule} must remain in Merge.yaml`);
+  }
+
+  const applicationsIndex = mergeSource.indexOf("- RULE-SET,applications,DIRECT");
+  const cnDomainIndex = mergeSource.indexOf("- RULE-SET,cn-domain,DIRECT");
+  const globalDomainIndex = mergeSource.indexOf("- RULE-SET,global-domain,Proxies");
+  assert(applicationsIndex > 0, "applications rule must exist");
+  assert(applicationsIndex < cnDomainIndex, "applications must run before the domestic base layer");
+  assert(applicationsIndex < globalDomainIndex, "applications must run before the global base layer");
 }
 
 {
