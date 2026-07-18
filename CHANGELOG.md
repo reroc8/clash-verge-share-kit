@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+## v0.3.18
+
+- 修复顶层节点键误用 `Proxies / PROXIES` 等大小写变体时，节点被静默忽略并退化为 `DIRECT` 的问题。
+- 修复纯内联节点订阅启用策略组压缩后，规则、子规则或规则集下载仍指向被删除自定义组，导致 Mihomo 拒绝启动的问题。
+- 修复 Windows 和 macOS 同步 `profiles.yaml` 时类型状态可能跨条目泄漏、误覆盖普通订阅文件的问题。
+- 修复 Windows 安装 BAT 单独位于项目根目录时无法回退查找 `install\install-windows.ps1` 的问题。
+- 增加大小写节点键、自定义规则组、子规则和 rule-provider 自定义下载组回归测试。
+
 ## v0.3.17
 
 - 本机候选测试：通用国内/私网基础规则改用 DustinWin MRS，通用海外域名改用 blackmatrix7 Global_Domain；保留专用业务规则和最终 `MATCH,DIRECT`。

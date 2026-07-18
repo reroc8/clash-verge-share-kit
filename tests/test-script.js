@@ -20,6 +20,56 @@ function groupByName(config, name) {
 
 {
   const output = run({
+    Proxies: [{ name: "HK-A" }, { name: "US-C" }],
+    "proxy-groups": [],
+    rules: ["MATCH,DIRECT"]
+  });
+
+  assert.deepStrictEqual(output.proxies.map((proxy) => proxy.name), ["HK-A", "US-C"]);
+  assert.strictEqual(output.Proxies, undefined, "compatibility proxy key must be normalized to lowercase");
+  assert.deepStrictEqual(groupByName(output, "HK").proxies, ["HK-A"]);
+  assert.deepStrictEqual(groupByName(output, "US").proxies, ["US-C"]);
+}
+
+{
+  const output = run({
+    proxies: [{ name: "US-A" }, { name: "HK-A" }],
+    "proxy-groups": [
+      { name: "Helper", type: "select", proxies: ["US-A"] },
+      { name: "Custom", type: "select", proxies: ["Helper"] }
+    ],
+    rules: ["DOMAIN-SUFFIX,example.com,Custom", "MATCH,DIRECT"]
+  });
+
+  assert(groupByName(output, "Custom"), "custom rule target must survive compact mode");
+  assert(groupByName(output, "Helper"), "dependencies of a referenced custom group must survive compact mode");
+  assert(output.rules.includes("DOMAIN-SUFFIX,example.com,Custom"));
+}
+
+{
+  const providerOutput = run({
+    proxies: [{ name: "US-A" }],
+    "proxy-groups": [{ name: "Download Route", type: "select", proxies: ["US-A"] }],
+    "rule-providers": {
+      custom: { type: "inline", behavior: "domain", proxy: "Download Route", payload: ["example.test"] }
+    },
+    rules: ["MATCH,DIRECT"]
+  });
+  assert(groupByName(providerOutput, "Download Route"), "rule-provider proxy target must survive compact mode");
+
+  const subRuleOutput = run({
+    proxies: [{ name: "US-A" }],
+    "proxy-groups": [{ name: "Custom", type: "select", proxies: ["US-A"] }],
+    "sub-rules": {
+      custom: ["DOMAIN-SUFFIX,example.test,Custom"]
+    },
+    rules: ["SUB-RULE,(NETWORK,TCP),custom", "MATCH,DIRECT"]
+  });
+  assert(groupByName(subRuleOutput, "Custom"), "sub-rule target must survive compact mode");
+}
+
+{
+  const output = run({
     proxies: [{ name: "US" }, { name: "TW" }, { name: "Proxies" }, { name: "SG-A" }],
     "proxy-groups": [],
     "rule-providers": {
