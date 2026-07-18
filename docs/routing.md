@@ -46,7 +46,9 @@ Claude / AI / Google / YouTube / Telegram / Exchange / US / TW / SG / HK / JP / 
 - 安装脚本不再要求订阅必须有固定策略组名。
 - 安装脚本会同步 `profiles.yaml` 中已有订阅绑定的 merge/script 文件，避免当前订阅继续使用旧脚本。
 - `Script.js` 会自动补齐 `Proxies / Claude / AI / US / Google / YouTube / Telegram / Exchange`；如果已有大小写不同的同名组，会复用已有组名并改写规则目标。
+- 顶层节点键优先使用标准小写 `proxies`；小写键缺失时兼容 `Proxies / PROXIES` 等大小写变体，并统一规范化为小写。
 - 纯内联节点订阅会压缩原始策略组；存在 `proxy-providers` 的纯 provider 或混合订阅会保留原始 provider 组，避免节点入口丢失。
+- 纯内联节点订阅如果仍有规则、子规则或规则集下载引用自定义组，会自动关闭压缩并保留全部原始组，避免规则指向不存在的策略组。
 - 远程规则集显式通过 `Proxies` 下载，降低新机器首次启动时直连 GitHub Raw 失败的概率。
 - `Claude` 组会被强制更新为仅包含 `US`，用于降低 Claude 出口地区变化。
 - `AI` 组会被强制更新为仅包含 `US / TW`，用于降低国际 AI 服务出口地区变化；中国大陆 AI 不进入该组。

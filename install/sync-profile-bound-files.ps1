@@ -44,17 +44,23 @@ try {
     Get-Content -LiteralPath $profilesYaml -Encoding UTF8 -ErrorAction Stop | ForEach-Object {
         $line = $_
 
-        if ($line -match '^- uid:') {
+        if ($line -match '^\s*-\s*uid:') {
             $script:ItemType = $null
             return
         }
 
-        if ($line -match '^\s*type:\s*(merge|script)\s*$') {
-            $script:ItemType = $Matches[1]
+        if ($line -match '^\s*type:\s*(.*?)\s*$') {
+            $candidateType = $Matches[1].Trim()
+            $script:ItemType = $null
+            if ($candidateType -eq 'merge' -or $candidateType -eq 'script') {
+                $script:ItemType = $candidateType
+            }
             return
         }
 
         if ($line -match '^\s*file:\s*(.+?)\s*$' -and ($script:ItemType -eq 'merge' -or $script:ItemType -eq 'script')) {
+            $currentItemType = $script:ItemType
+            $script:ItemType = $null
             $file = $Matches[1].Trim().Trim([char]34).Trim([char]39)
             if ([string]::IsNullOrWhiteSpace($file) -or $file -match '[\\/:]' -or $file -match '\.\.') {
                 return
@@ -74,7 +80,7 @@ try {
                 }
             }
 
-            if ($script:ItemType -eq 'merge') {
+            if ($currentItemType -eq 'merge') {
                 $src = Join-Path $ConfigDir 'Merge.yaml'
             } else {
                 $src = Join-Path $ConfigDir 'Script.js'

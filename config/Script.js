@@ -34,7 +34,23 @@ function main(config, profileName) {
     }
   }
 
-  var rawProxies = Array.isArray(config.proxies) ? config.proxies : [];
+  var proxyListKey = "proxies";
+  var rawProxies = config.proxies;
+  if (!Array.isArray(rawProxies)) {
+    for (var configKey in config) {
+      if (config.hasOwnProperty(configKey) &&
+          configKey !== "proxies" &&
+          normalizeName(configKey) === "proxies" &&
+          Array.isArray(config[configKey])) {
+        proxyListKey = configKey;
+        rawProxies = config[configKey];
+        break;
+      }
+    }
+  }
+  if (!Array.isArray(rawProxies)) {
+    rawProxies = [];
+  }
   var proxies = [];
   for (var p = 0; p < rawProxies.length; p++) {
     if (rawProxies[p] && rawProxies[p].name) {
@@ -44,6 +60,9 @@ function main(config, profileName) {
     }
   }
   config.proxies = proxies;
+  if (proxyListKey !== "proxies") {
+    delete config[proxyListKey];
+  }
 
   function unique(items) {
     var seen = {};
@@ -237,7 +256,79 @@ function main(config, profileName) {
       }
     }
   }
-  var compactGroupsEnabled = originalProxies.length > 0 && !hasProxyProviders;
+  var managedPreferredGroupNames = {
+    proxies: true,
+    claude: true,
+    ai: true,
+    google: true,
+    youtube: true,
+    telegram: true,
+    exchange: true,
+    hk: true,
+    jp: true,
+    sg: true,
+    tw: true,
+    us: true
+  };
+  var originalCustomGroupNames = {};
+  for (var originalGroupIndex = 0; originalGroupIndex < originalGroups.length; originalGroupIndex++) {
+    var originalGroupName = originalGroups[originalGroupIndex];
+    if (!managedPreferredGroupNames[normalizeName(originalGroupName)]) {
+      originalCustomGroupNames[originalGroupName] = true;
+    }
+  }
+
+  function ruleReferencesCustomGroup(rule) {
+    if (typeof rule !== "string") {
+      return false;
+    }
+    var parts = splitRuleParts(rule);
+    if (parts.length < 2) {
+      return false;
+    }
+    var ruleType = String(parts[0] || "").toUpperCase();
+    var targetIndex = ruleType === "MATCH" || ruleType === "FINAL" ? 1 : 2;
+    return parts.length > targetIndex && originalCustomGroupNames[parts[targetIndex]] === true;
+  }
+
+  function ruleListReferencesCustomGroup(ruleList) {
+    if (!Array.isArray(ruleList)) {
+      return false;
+    }
+    for (var ruleIndex = 0; ruleIndex < ruleList.length; ruleIndex++) {
+      if (ruleReferencesCustomGroup(ruleList[ruleIndex])) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  var customGroupIsReferenced = ruleListReferencesCustomGroup(config.rules);
+  var subRules = config["sub-rules"];
+  if (!customGroupIsReferenced && subRules && typeof subRules === "object") {
+    for (var subRuleName in subRules) {
+      if (subRules.hasOwnProperty(subRuleName) && ruleListReferencesCustomGroup(subRules[subRuleName])) {
+        customGroupIsReferenced = true;
+        break;
+      }
+    }
+  }
+  if (!customGroupIsReferenced && ruleProviders && typeof ruleProviders === "object") {
+    for (var compactProviderName in ruleProviders) {
+      if (!ruleProviders.hasOwnProperty(compactProviderName)) {
+        continue;
+      }
+      var compactProvider = ruleProviders[compactProviderName];
+      if (compactProvider && originalCustomGroupNames[compactProvider.proxy]) {
+        customGroupIsReferenced = true;
+        break;
+      }
+    }
+  }
+
+  var compactGroupsEnabled = originalProxies.length > 0 &&
+    !hasProxyProviders &&
+    !customGroupIsReferenced;
 
   var preferredGeneralGroups = [
     "节点选择",

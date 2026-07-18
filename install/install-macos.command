@@ -128,9 +128,20 @@ sync_profile_bound_files() {
     [ -f "$profiles_yaml" ] || return 0
 
     awk '
-        /^[[:space:]]*- uid:/ { item_type = "" }
-        /^[[:space:]]*type:[[:space:]]*(merge|script)[[:space:]]*$/ { item_type = $2 }
+        /^[[:space:]]*-[[:space:]]*uid:/ { item_type = "" }
+        /^[[:space:]]*type:/ {
+            item_type = ""
+            type_value = $0
+            sub(/^[[:space:]]*type:[[:space:]]*/, "", type_value)
+            sub(/[[:space:]]*$/, "", type_value)
+            if (type_value == "merge" || type_value == "script") {
+                item_type = type_value
+            }
+            next
+        }
         /^[[:space:]]*file:[[:space:]]*/ {
+            current_item_type = item_type
+            item_type = ""
             file = $0
             sub(/^[[:space:]]*file:[[:space:]]*/, "", file)
             sub(/[[:space:]]*$/, "", file)
@@ -142,8 +153,8 @@ sync_profile_bound_files() {
                 sub(/^\047/, "", file)
                 sub(/\047$/, "", file)
             }
-            if (item_type == "merge" || item_type == "script") {
-                print item_type "\t" file
+            if (current_item_type == "merge" || current_item_type == "script") {
+                print current_item_type "\t" file
             }
         }
     ' "$profiles_yaml" | while IFS=$'\t' read -r item_type file_name; do
