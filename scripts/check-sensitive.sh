@@ -5,7 +5,7 @@ ROOT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 TMP_FILE="$(mktemp "${TMPDIR:-/tmp}/clash-verge-share-kit-sensitive.XXXXXX")"
 trap 'rm -f "$TMP_FILE"' EXIT
 
-SENSITIVE_PATTERN='(^[[:space:]]*(proxies|proxy-providers):[[:space:]]*$|^[[:space:]-]*(server|password|uuid|cipher|alterId|client-fingerprint|private-key|servername|sni|skip-cert-verify):[[:space:]]*|https?://[^[:space:]"]*(token=|subscribe|subscription|api/v1/client/subscribe|api/v1/passport/auth/subscribe))'
+SENSITIVE_PATTERN='((^|[^[:alnum:]_-])["'"'"']?(server|password|uuid|cipher|alterId|client-fingerprint|private-key|servername|sni|skip-cert-verify|secret)["'"'"']?[[:space:]]*:|(^|[[:space:]{,])["'"'"']?(proxies|proxy-providers)["'"'"']?[[:space:]]*:[[:space:]]*([\[{]|$)|(ss|vmess|vless|trojan|hysteria2|tuic|wireguard)://[^[:space:]"'"'"'`、]+|https?://[^[:space:]"'"'"']*(token=|subscribe|subscription|api/v1/client/subscribe|api/v1/passport/auth/subscribe))'
 if [ "$#" -gt 0 ]; then
     SCAN_TARGETS=("$@")
 else
@@ -39,16 +39,19 @@ STATUS=$?
 set -e
 
 if [ "$STATUS" -eq 0 ]; then
-    # 仅豁免 tests/ 目录测试夹具中的本地回环 server 地址
-    # （如 tests/test-script.js 的 server: "127.0.0.1"）。
-    # 限定目录 + 回环地址，避免整行豁免放过真实敏感字段。
-    FILTERED="$(grep -v -E '/tests/[^:]+:[0-9]+:.*server:[[:space:]]*["'"'"']?(127\.0\.0\.1|localhost|::1)' "$TMP_FILE" || true)"
+    # 豁免范围（均为合法测试/自指内容，凭据键与节点 URI 仍严格检查）：
+    # 1) tests/ 目录测试夹具中的本地回环 server 地址（如 server: "127.0.0.1"）
+    # 2) tests/ 目录测试夹具中的 proxies / proxy-providers 结构键行
+    # 3) check-sensitive.sh 自身（模式定义中含键名与 URI 字面量）
+    FILTERED="$(grep -v -i -E '/tests/[^:]+:[0-9]+:.*server:[[:space:]]*["'"'"']?(127\.0\.0\.1|localhost|::1)' "$TMP_FILE" \
+        | grep -v -i -E '/tests/[^:]+:[0-9]+:.*["'"'"']?(proxies|proxy-providers)["'"'"']?[[:space:]]*:' \
+        | grep -v -E '/check-sensitive\.sh:[0-9]+:' || true)"
     if [ -n "$FILTERED" ]; then
         echo "敏感信息扫描失败，疑似包含订阅、节点或 token:"
         printf '%s\n' "$FILTERED"
         exit 1
     fi
-    echo "敏感信息扫描通过: 使用 $SCAN_TOOL（已豁免 tests/ 本地回环测试地址）"
+    echo "敏感信息扫描通过: 使用 $SCAN_TOOL（已豁免 tests/ 夹具与扫描器自指内容）"
     exit 0
 fi
 
