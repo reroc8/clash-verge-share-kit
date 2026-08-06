@@ -160,7 +160,7 @@ Proxies
 
 如果订阅里没有这些固定组名，`Script.js` 会尽量自动识别常见节点和地区名称，并补齐缺失策略组。已有 `proxies` 这类大小写不同的同名组时，会复用原组名并自动改写规则目标。若节点本身恰好叫 `US`、`TW`、`Proxies` 等固定组名，自动策略组会改用 `US Group`、`TW Group`、`Proxies Group` 这类备用名，避免和节点同名形成循环。识别不到时会降级到 `Proxies` 或 `DIRECT`，优先保证配置能启动。
 
-普通机场订阅通常会带很多自有策略组。对于节点直接写在 `proxies` 中、且不使用 `proxy-providers` 的普通订阅，安装后会隐藏没有被规则引用的杂乱原始组，只保留核心组；节点本身不会删除。如果规则、子规则或规则集下载仍引用自定义策略组，脚本会自动关闭界面压缩并保留全部原始组，避免产生悬空规则。只要订阅使用或混合使用 `proxy-providers`，脚本也会保守保留原始 provider 策略组。
+普通机场订阅通常会带很多自有策略组。对于节点直接写在 `proxies` 中、且不使用 `proxy-providers` 的普通订阅，安装后会隐藏没有被使用的杂乱原始组，只保留核心组；节点本身不会删除。如果规则、子规则、规则集下载、`dialer-proxy`、监听器、隧道或 NTP 仍引用自定义策略组，脚本会自动关闭界面压缩并保留全部原始组，避免产生悬空引用。只要订阅使用或混合使用 `proxy-providers`，脚本也会保守保留原始 provider 策略组。
 
 <!-- release-readme:resume -->
 
@@ -214,8 +214,8 @@ dns_config.yaml
 
 1. 完全退出 Clash Verge Rev。
 2. 打开安装脚本提示的 `backup_*` 目录。
-3. 把 `Merge.yaml`、`Script.js`，以及备份目录里其它随机命名的 `.yaml` / `.js` 复制回 Clash Verge Rev 数据目录里的 `profiles/`。
-4. 把 `verge.yaml`、`dns_config.yaml` 复制回 Clash Verge Rev 数据目录根目录。
+3. 把备份目录 `profiles/` 里的文件复制回 Clash Verge Rev 数据目录里的 `profiles/`。
+4. 把备份目录 `root/` 里的文件复制回 Clash Verge Rev 数据目录根目录。
 5. 如果备份目录里的 `created-files.txt` 不是空的，删除其中逐行列出的文件；这些文件在安装前不存在，是本次安装新建的。
 6. 重新打开 Clash Verge Rev。
 

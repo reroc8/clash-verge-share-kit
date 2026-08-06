@@ -4,3 +4,5 @@ dist/
 *.bak
 *.log
 node_modules/
+.reasonix/
+reasonix.toml

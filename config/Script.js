@@ -1,9 +1,17 @@
 function main(config, profileName) {
-  var groupNames = {};
-  var groupNameByLower = {};
-  var proxyNames = {};
-  var proxyNameByLower = {};
-  var managedGroupNameByPreferred = {};
+  function createNameMap() {
+    return Object.create(null);
+  }
+
+  function hasOwn(object, key) {
+    return Object.prototype.hasOwnProperty.call(object, key);
+  }
+
+  var groupNames = createNameMap();
+  var groupNameByLower = createNameMap();
+  var proxyNames = createNameMap();
+  var proxyNameByLower = createNameMap();
+  var managedGroupNameByPreferred = createNameMap();
 
   function normalizeName(name) {
     return String(name || "").toLowerCase();
@@ -21,7 +29,7 @@ function main(config, profileName) {
   }
 
   var ruleProviders = config["rule-providers"];
-  if (ruleProviders && ruleProviders.reject) {
+  if (ruleProviders && hasOwn(ruleProviders, "reject")) {
     delete ruleProviders.reject;
   }
 
@@ -38,7 +46,7 @@ function main(config, profileName) {
   var rawProxies = config.proxies;
   if (!Array.isArray(rawProxies)) {
     for (var configKey in config) {
-      if (config.hasOwnProperty(configKey) &&
+      if (hasOwn(config, configKey) &&
           configKey !== "proxies" &&
           normalizeName(configKey) === "proxies" &&
           Array.isArray(config[configKey])) {
@@ -65,7 +73,7 @@ function main(config, profileName) {
   }
 
   function unique(items) {
-    var seen = {};
+    var seen = createNameMap();
     var result = [];
     for (var i = 0; i < items.length; i++) {
       var item = items[i];
@@ -250,7 +258,7 @@ function main(config, profileName) {
   var hasProxyProviders = false;
   if (proxyProviders && typeof proxyProviders === "object") {
     for (var providerName in proxyProviders) {
-      if (proxyProviders.hasOwnProperty(providerName)) {
+      if (hasOwn(proxyProviders, providerName)) {
         hasProxyProviders = true;
         break;
       }
@@ -270,10 +278,10 @@ function main(config, profileName) {
     tw: true,
     us: true
   };
-  var originalCustomGroupNames = {};
+  var originalCustomGroupNames = createNameMap();
   for (var originalGroupIndex = 0; originalGroupIndex < originalGroups.length; originalGroupIndex++) {
     var originalGroupName = originalGroups[originalGroupIndex];
-    if (!managedPreferredGroupNames[normalizeName(originalGroupName)]) {
+    if (!hasOwn(managedPreferredGroupNames, normalizeName(originalGroupName))) {
       originalCustomGroupNames[originalGroupName] = true;
     }
   }
@@ -287,8 +295,11 @@ function main(config, profileName) {
       return false;
     }
     var ruleType = String(parts[0] || "").toUpperCase();
+    if (ruleType === "SUB-RULE") {
+      return false;
+    }
     var targetIndex = ruleType === "MATCH" || ruleType === "FINAL" ? 1 : 2;
-    return parts.length > targetIndex && originalCustomGroupNames[parts[targetIndex]] === true;
+    return parts.length > targetIndex && hasOwn(originalCustomGroupNames, parts[targetIndex]);
   }
 
   function ruleListReferencesCustomGroup(ruleList) {
@@ -307,7 +318,7 @@ function main(config, profileName) {
   var subRules = config["sub-rules"];
   if (!customGroupIsReferenced && subRules && typeof subRules === "object") {
     for (var subRuleName in subRules) {
-      if (subRules.hasOwnProperty(subRuleName) && ruleListReferencesCustomGroup(subRules[subRuleName])) {
+      if (hasOwn(subRules, subRuleName) && ruleListReferencesCustomGroup(subRules[subRuleName])) {
         customGroupIsReferenced = true;
         break;
       }
@@ -315,11 +326,24 @@ function main(config, profileName) {
   }
   if (!customGroupIsReferenced && ruleProviders && typeof ruleProviders === "object") {
     for (var compactProviderName in ruleProviders) {
-      if (!ruleProviders.hasOwnProperty(compactProviderName)) {
+      if (!hasOwn(ruleProviders, compactProviderName)) {
         continue;
       }
       var compactProvider = ruleProviders[compactProviderName];
-      if (compactProvider && originalCustomGroupNames[compactProvider.proxy]) {
+      if (compactProvider && hasOwn(originalCustomGroupNames, compactProvider.proxy)) {
+        customGroupIsReferenced = true;
+        break;
+      }
+    }
+  }
+
+  function referencesCustomGroup(name) {
+    return typeof name === "string" && hasOwn(originalCustomGroupNames, name);
+  }
+
+  if (!customGroupIsReferenced) {
+    for (var dialerProxyIndex = 0; dialerProxyIndex < proxies.length; dialerProxyIndex++) {
+      if (referencesCustomGroup(proxies[dialerProxyIndex]["dialer-proxy"])) {
         customGroupIsReferenced = true;
         break;
       }
@@ -369,13 +393,13 @@ function main(config, profileName) {
     JP: [/日本/i, /Japan/i, /Tokyo/i, /Osaka/i, /(^|[^A-Za-z])JP([^A-Za-z]|$)/i, /🇯🇵/],
     SG: [/新加坡/i, /Singapore/i, /(^|[^A-Za-z])SG([^A-Za-z]|$)/i, /🇸🇬/],
     TW: [/台湾/i, /台灣/i, /臺灣/i, /Taiwan/i, /(^|[^A-Za-z])TW([^A-Za-z]|$)/i, /🇹🇼/],
-    US: [/美国/i, /美國/i, /United States/i, /America/i, /(^|[^A-Za-z])US([^A-Za-z]|$)/i, /(^|[^A-Za-z])USA([^A-Za-z]|$)/i, /🇺🇸/]
+    US: [/美国/i, /美國/i, /United States/i, /(^|[^A-Za-z])US([^A-Za-z]|$)/i, /(^|[^A-Za-z])USA([^A-Za-z]|$)/i, /🇺🇸/]
   };
 
   var managedGroups = {
     Proxies: PROXIES_GROUP
   };
-  var detectedRegions = {};
+  var detectedRegions = createNameMap();
 
   var regionOrder = ["HK", "JP", "SG", "TW", "US"];
   for (var ro = 0; ro < regionOrder.length; ro++) {
@@ -422,16 +446,16 @@ function main(config, profileName) {
   managedGroups.Telegram = ensureManagedGroup("Telegram", [PROXIES_GROUP, managedGroups.HK, managedGroups.JP, managedGroups.SG, managedGroups.TW, managedGroups.US], [PROXIES_GROUP]);
   managedGroups.Exchange = ensureManagedGroup("Exchange", [managedGroups.TW, managedGroups.SG], ["REJECT"]);
 
-  var managedTargetMap = {};
+  var managedTargetMap = createNameMap();
   for (var managedName in managedGroups) {
-    if (managedGroups.hasOwnProperty(managedName)) {
+    if (hasOwn(managedGroups, managedName)) {
       managedTargetMap[managedName] = managedGroups[managedName];
     }
   }
 
   if (ruleProviders && typeof ruleProviders === "object") {
     for (var ruleProviderName in ruleProviders) {
-      if (!ruleProviders.hasOwnProperty(ruleProviderName)) {
+      if (!hasOwn(ruleProviders, ruleProviderName)) {
         continue;
       }
       var ruleProvider = ruleProviders[ruleProviderName];
@@ -442,15 +466,15 @@ function main(config, profileName) {
   }
 
   if (compactGroupsEnabled) {
-    var keepGroupNames = {};
+    var keepGroupNames = createNameMap();
     for (var keepName in managedTargetMap) {
-      if (managedTargetMap.hasOwnProperty(keepName)) {
+      if (hasOwn(managedTargetMap, keepName)) {
         keepGroupNames[managedTargetMap[keepName]] = true;
       }
     }
 
     var compactGroups = [];
-    var compactSeen = {};
+    var compactSeen = createNameMap();
     for (var cg = 0; cg < groups.length; cg++) {
       var compactGroup = groups[cg];
       if (compactGroup && keepGroupNames[compactGroup.name] && !compactSeen[compactGroup.name]) {
@@ -476,7 +500,7 @@ function main(config, profileName) {
     PROXIES_GROUP
   ];
   var orderedGroups = [];
-  var orderedSeen = {};
+  var orderedSeen = createNameMap();
   function appendGroupByName(name) {
     if (!name || orderedSeen[name]) {
       return;
@@ -534,6 +558,9 @@ function main(config, profileName) {
     }
     var ruleType = String(parts[0] || "").toUpperCase();
     var changed = false;
+    if (ruleType === "SUB-RULE") {
+      return rule;
+    }
     if (ruleType === "FINAL") {
       parts[0] = "MATCH";
       ruleType = "MATCH";
@@ -609,7 +636,7 @@ function main(config, profileName) {
     "upbit.com"
   ];
 
-  var exchangeDomainSet = {};
+  var exchangeDomainSet = createNameMap();
   for (var k = 0; k < exchangeDomains.length; k++) {
     exchangeDomainSet[exchangeDomains[k]] = true;
   }
@@ -619,7 +646,9 @@ function main(config, profileName) {
       return false;
     }
     var parts = splitRuleParts(rule);
-    return parts[0] === "DOMAIN-SUFFIX" && exchangeDomainSet[parts[1]] === true;
+    var type = String(parts[0] || "").trim().toUpperCase();
+    var domain = String(parts[1] || "").trim().toLowerCase();
+    return type === "DOMAIN-SUFFIX" && exchangeDomainSet[domain] === true;
   }
 
   function isRejectRule(rule) {
@@ -631,6 +660,9 @@ function main(config, profileName) {
       return false;
     }
     var type = String(parts[0] || "").toUpperCase();
+    if (type === "SUB-RULE") {
+      return false;
+    }
     var targetIndex = type === "MATCH" || type === "FINAL" ? 1 : 2;
     var providerName = String(parts[1] || "").toLowerCase();
     var target = String(parts[targetIndex] || "").toUpperCase();
@@ -642,7 +674,29 @@ function main(config, profileName) {
     exchangeRules.push("DOMAIN-SUFFIX," + exchangeDomains[er] + "," + managedGroups.Exchange);
   }
 
-  var rules = config.rules || [];
+  function rewriteRuleList(ruleList) {
+    if (!Array.isArray(ruleList)) {
+      return [];
+    }
+    var rewrittenRules = [];
+    for (var ruleIndex = 0; ruleIndex < ruleList.length; ruleIndex++) {
+      var rewrittenRule = rewriteRuleTarget(ruleList[ruleIndex]);
+      if (!isRejectRule(rewrittenRule)) {
+        rewrittenRules.push(rewrittenRule);
+      }
+    }
+    return rewrittenRules;
+  }
+
+  if (subRules && typeof subRules === "object") {
+    for (var rewriteSubRuleName in subRules) {
+      if (hasOwn(subRules, rewriteSubRuleName) && Array.isArray(subRules[rewriteSubRuleName])) {
+        subRules[rewriteSubRuleName] = rewriteRuleList(subRules[rewriteSubRuleName]);
+      }
+    }
+  }
+
+  var rules = Array.isArray(config.rules) ? config.rules : [];
   var cleanedRules = [];
   for (var r = 0; r < rules.length; r++) {
     var rewrittenRule = rewriteRuleTarget(rules[r]);
@@ -674,8 +728,8 @@ function main(config, profileName) {
       "FINAL,"
     ];
 
-    for (var y = 0; y < broadRules.length; y++) {
-      if (upperRule.indexOf(broadRules[y]) === 0) {
+    for (var broadIndex = 0; broadIndex < broadRules.length; broadIndex++) {
+      if (upperRule.indexOf(broadRules[broadIndex]) === 0) {
         return true;
       }
     }
@@ -685,17 +739,15 @@ function main(config, profileName) {
   }
 
   var insertAt = -1;
-  for (var x = 0; x < cleanedRules.length; x++) {
-    if (isBroadRule(cleanedRules[x])) {
-      insertAt = x;
+  for (var cleanedRuleIndex = 0; cleanedRuleIndex < cleanedRules.length; cleanedRuleIndex++) {
+    if (isBroadRule(cleanedRules[cleanedRuleIndex])) {
+      insertAt = cleanedRuleIndex;
       break;
     }
   }
-
   if (insertAt === -1) {
     insertAt = 0;
   }
-
   cleanedRules.splice.apply(cleanedRules, [insertAt, 0].concat(exchangeRules));
   config.rules = cleanedRules;
 

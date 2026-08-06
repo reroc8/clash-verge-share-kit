@@ -39,9 +39,17 @@ STATUS=$?
 set -e
 
 if [ "$STATUS" -eq 0 ]; then
-    echo "敏感信息扫描失败，疑似包含订阅、节点或 token:"
-    cat "$TMP_FILE"
-    exit 1
+    # 仅豁免 tests/ 目录测试夹具中的本地回环 server 地址
+    # （如 tests/test-script.js 的 server: "127.0.0.1"）。
+    # 限定目录 + 回环地址，避免整行豁免放过真实敏感字段。
+    FILTERED="$(grep -v -E '/tests/[^:]+:[0-9]+:.*server:[[:space:]]*["'"'"']?(127\.0\.0\.1|localhost|::1)' "$TMP_FILE" || true)"
+    if [ -n "$FILTERED" ]; then
+        echo "敏感信息扫描失败，疑似包含订阅、节点或 token:"
+        printf '%s\n' "$FILTERED"
+        exit 1
+    fi
+    echo "敏感信息扫描通过: 使用 $SCAN_TOOL（已豁免 tests/ 本地回环测试地址）"
+    exit 0
 fi
 
 if [ "$STATUS" -ne 1 ]; then

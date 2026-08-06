@@ -35,19 +35,27 @@ function Restore-FromBackup {
         }
     }
 
-    Get-ChildItem -LiteralPath $script:BackupDir -File | ForEach-Object {
-        if ($_.Name -eq 'created-files.txt') { return }
-        if ($_.Name -eq 'verge.yaml' -or $_.Name -eq 'dns_config.yaml') {
-            $target = Join-Path $script:ClashDir $_.Name
-        } else {
-            $target = Join-Path $script:ProfilesDir $_.Name
-        }
+    foreach ($scope in @('root', 'profiles')) {
+        $scopeDir = Join-Path $script:BackupDir $scope
+        if (-not (Test-Path -LiteralPath $scopeDir -PathType Container)) { continue }
+        Get-ChildItem -LiteralPath $scopeDir -File -Recurse | ForEach-Object {
+            $relativePath = $_.FullName.Substring($scopeDir.Length).TrimStart([char]92, [char]47)
+            if ($scope -eq 'root') {
+                $target = Join-Path $script:ClashDir $relativePath
+            } else {
+                $target = Join-Path $script:ProfilesDir $relativePath
+            }
 
-        try {
-            Copy-Item -LiteralPath $_.FullName -Destination $target -Force -ErrorAction Stop
-        } catch {
-            Say-B64 '6K2m5ZGKOiDmgaLlpI3lpLHotKU6'
-            Say-Path $target
+            try {
+                $targetParent = Split-Path -Parent $target
+                if (-not (Test-Path -LiteralPath $targetParent -PathType Container)) {
+                    New-Item -ItemType Directory -Path $targetParent -Force -ErrorAction Stop | Out-Null
+                }
+                Copy-Item -LiteralPath $_.FullName -Destination $target -Force -ErrorAction Stop
+            } catch {
+                Say-B64 '6K2m5ZGKOiDmgaLlpI3lpLHotKU6'
+                Say-Path $target
+            }
         }
     }
 
@@ -75,6 +83,10 @@ function Backup-ExistingFile {
     if (Test-Path -LiteralPath $Source -PathType Leaf) {
         $backupPath = Join-Path $script:BackupDir $BackupName
         if (-not (Test-Path -LiteralPath $backupPath)) {
+            $backupParent = Split-Path -Parent $backupPath
+            if (-not (Test-Path -LiteralPath $backupParent -PathType Container)) {
+                New-Item -ItemType Directory -Path $backupParent -Force -ErrorAction Stop | Out-Null
+            }
             Copy-Item -LiteralPath $Source -Destination $backupPath -Force -ErrorAction Stop
         }
     } else {
@@ -166,10 +178,10 @@ try {
     $script:CreatedFilesList = Join-Path $script:BackupDir 'created-files.txt'
     Set-Content -LiteralPath $script:CreatedFilesList -Value '' -Encoding UTF8
 
-    Backup-ExistingFile (Join-Path $script:ProfilesDir 'Merge.yaml') 'Merge.yaml'
-    Backup-ExistingFile (Join-Path $script:ProfilesDir 'Script.js') 'Script.js'
-    Backup-ExistingFile (Join-Path $script:ClashDir 'verge.yaml') 'verge.yaml'
-    Backup-ExistingFile (Join-Path $script:ClashDir 'dns_config.yaml') 'dns_config.yaml'
+    Backup-ExistingFile (Join-Path $script:ProfilesDir 'Merge.yaml') 'profiles\Merge.yaml'
+    Backup-ExistingFile (Join-Path $script:ProfilesDir 'Script.js') 'profiles\Script.js'
+    Backup-ExistingFile (Join-Path $script:ClashDir 'verge.yaml') 'root\verge.yaml'
+    Backup-ExistingFile (Join-Path $script:ClashDir 'dns_config.yaml') 'root\dns_config.yaml'
 
     Say-B64 '5q2j5Zyo5a6J6KOFLi4u'
     $script:InstallStarted = $true
@@ -183,8 +195,9 @@ try {
     $env:SYNC_CLASH_DIR = $script:ClashDir
     $env:SYNC_CONFIG_DIR = $configDir
     $env:SYNC_BACKUP_DIR = $script:BackupDir
-    & powershell -NoProfile -ExecutionPolicy Bypass -File $syncScript | Out-Null
-    if ($LASTEXITCODE -ne 0) {
+    $null = & powershell -NoProfile -ExecutionPolicy Bypass -File $syncScript
+    $syncExitCode = $LASTEXITCODE
+    if ($syncExitCode -ne 0) {
         Fail-Install '6ZSZ6K+vOiDlkIzmraXlt7LmnInorqLpmIXnu5HlrprnmoTphY3nva7mlofku7blpLHotKXjgII='
     }
     Say-B64 '5bey5ZCM5q2l5bey5pyJ6K6i6ZiF57uR5a6a55qE6YWN572u5paH5Lu244CC'

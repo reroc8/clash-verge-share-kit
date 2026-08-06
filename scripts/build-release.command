@@ -46,16 +46,65 @@ else
     ZIP_NAME="clash-verge-share-kit-${PACKAGE_VERSION}.zip"
 fi
 TMP_DIR=$(mktemp -d)
-trap 'rm -rf "$TMP_DIR"' EXIT
+ARCHIVE_TMP=""
+cleanup() {
+    rm -rf "$TMP_DIR"
+    if [ -n "$ARCHIVE_TMP" ]; then
+        rm -f "$ARCHIVE_TMP"
+    fi
+}
+trap cleanup EXIT
 
 if ! command -v node >/dev/null 2>&1; then
     echo "错误: 未找到 Node.js，无法运行 Script.js 回归测试"
     exit 1
 fi
 node --check "$ROOT_DIR/config/Script.js"
-node "$ROOT_DIR/tests/test-script.js"
+
+MIHOMO_BIN="${MIHOMO_BIN:-}"
+if [ -z "$MIHOMO_BIN" ] && command -v mihomo >/dev/null 2>&1; then
+    MIHOMO_BIN="$(command -v mihomo)"
+fi
+if [ -z "$MIHOMO_BIN" ] && [ -x "/Applications/Clash Verge.app/Contents/MacOS/verge-mihomo" ]; then
+    MIHOMO_BIN="/Applications/Clash Verge.app/Contents/MacOS/verge-mihomo"
+fi
+if [ -n "$MIHOMO_BIN" ] && [ -x "$MIHOMO_BIN" ]; then
+    MIHOMO_BIN="$MIHOMO_BIN" node "$ROOT_DIR/tests/test-script.js"
+else
+    node "$ROOT_DIR/tests/test-script.js"
+    echo "警告: 未找到 Mihomo，已跳过真实内核配置验证"
+fi
+
+if command -v ruby >/dev/null 2>&1; then
+    ruby -e 'require "yaml"; ARGV.each { |path| YAML.load_file(path) }' \
+        "$ROOT_DIR/config/Merge.yaml" \
+        "$ROOT_DIR/config/verge.yaml" \
+        "$ROOT_DIR/config/dns_config.yaml"
+else
+    echo "警告: 未找到 Ruby，已跳过 YAML 解析验证"
+fi
+
 bash -n "$ROOT_DIR/install/install-macos.command"
 bash -n "$ROOT_DIR/scripts/check-sensitive.sh"
+bash -n "$ROOT_DIR/tests/test-installers.sh"
+bash "$ROOT_DIR/tests/test-installers.sh"
+
+POWERSHELL_BIN=""
+if command -v pwsh >/dev/null 2>&1; then
+    POWERSHELL_BIN="$(command -v pwsh)"
+elif command -v powershell >/dev/null 2>&1; then
+    POWERSHELL_BIN="$(command -v powershell)"
+fi
+if [ -n "$POWERSHELL_BIN" ]; then
+    for ps_file in "$ROOT_DIR/install/install-windows.ps1" "$ROOT_DIR/install/sync-profile-bound-files.ps1"; do
+        "$POWERSHELL_BIN" -NoProfile -Command \
+            '$tokens = $null; $errors = $null; [void][System.Management.Automation.Language.Parser]::ParseFile($args[0], [ref]$tokens, [ref]$errors); if ($errors.Count -gt 0) { $errors | ForEach-Object { Write-Error $_ }; exit 1 }' \
+            "$ps_file"
+    done
+    "$POWERSHELL_BIN" -NoProfile -File "$ROOT_DIR/tests/test-windows-sync.ps1"
+else
+    echo "警告: 未找到 pwsh，已跳过 Windows PowerShell 语法与同步测试"
+fi
 
 "$ROOT_DIR/scripts/check-sensitive.sh"
 
@@ -132,10 +181,9 @@ fi
 
 "$ROOT_DIR/scripts/check-sensitive.sh" "$TMP_DIR"
 
-rm -f "$DIST_DIR/$ZIP_NAME"
-
 cd "$TMP_DIR"
-python3 - "$DIST_DIR/$ZIP_NAME" <<'PY'
+ARCHIVE_TMP="$(mktemp "$DIST_DIR/.${ZIP_NAME}.XXXXXX")"
+python3 - "$ARCHIVE_TMP" <<'PY'
 from pathlib import Path
 import sys
 import time
@@ -181,6 +229,9 @@ with zipfile.ZipFile(dest) as archive:
         if actual_mode != expected_mode:
             raise SystemExit(f"{item.filename} mode is {oct(actual_mode)}, expected {oct(expected_mode)}")
 PY
+
+mv -f "$ARCHIVE_TMP" "$DIST_DIR/$ZIP_NAME"
+ARCHIVE_TMP=""
 
 if [ -n "$VERSION" ] && [ "${KEEP_OLD_ZIPS:-0}" != "1" ]; then
     find "$DIST_DIR" -type f -name 'clash-verge-share-kit-*.zip' ! -name "$ZIP_NAME" -delete

@@ -4,7 +4,6 @@ setlocal
 set "SCRIPT_DIR=%~dp0"
 set "INSTALL_PS1=%SCRIPT_DIR%install-windows.ps1"
 if not exist "%INSTALL_PS1%" set "INSTALL_PS1=%SCRIPT_DIR%install\install-windows.ps1"
-if not exist "%INSTALL_PS1%" set "INSTALL_PS1=%SCRIPT_DIR%..\install\install-windows.ps1"
 
 where powershell >nul 2>nul
 if errorlevel 1 (
