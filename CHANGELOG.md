@@ -1,5 +1,14 @@
 # Changelog
 
+## v0.3.22
+
+- 修复无兜底规则（无 `MATCH/FINAL`）的订阅中，交易所规则被插到所有用户规则之前、行为与带兜底订阅不一致的问题；现在统一为"用户具体规则优先，交易所规则位于其之后、兜底层之前"。
+- `Exchange` 受控域名补充 `bybit.ada.support`。
+- README 修正 `REJECT` 显示条件表述：目标地区节点全部缺失时该组才只显示 `REJECT`，仅缺一个地区时保留其余地区节点。
+- 回归测试新增：`Merge.yaml` 规则引用的 rule-provider 均有定义的交叉校验、无兜底规则下交易所规则插入位置、`bybit.ada.support` 归属断言。
+- Windows 安装器 `created-files.txt` 统一为无 BOM 的 UTF-8 编码，与追加写入一致。
+- 发布门禁 `bash -n` 覆盖根目录 `macOS点我安装.command` 入口脚本。
+
 ## v0.3.21
 
 - Windows 安装器注册 Ctrl+C 中断处理：中断时自动回滚（对应 macOS 的 EXIT trap）；个别 PowerShell 版本注册失败仅失去中断回滚能力，不影响安装。

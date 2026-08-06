@@ -628,6 +628,7 @@ function main(config, profileName) {
     "bybit.biz",
     "bybitglobal.com",
     "bybit.cloud",
+    "bybit.ada.support",
     "bycsi.com",
     "bytick.com",
     "binance.com",
@@ -761,7 +762,9 @@ function main(config, profileName) {
     }
   }
   if (insertAt === -1) {
-    insertAt = 0;
+    // 无兜底规则时追加到末尾，与有 MATCH/FINAL 的场景一致：
+    // 交易所规则始终位于用户具体规则之后、兜底层之前。
+    insertAt = cleanedRules.length;
   }
   cleanedRules.splice.apply(cleanedRules, [insertAt, 0].concat(exchangeRules));
   config.rules = cleanedRules;
