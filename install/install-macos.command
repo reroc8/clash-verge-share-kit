@@ -23,8 +23,7 @@ done
 cleanup_old_backups() {
     installer_backups="$(
         while IFS= read -r backup_path; do
-            backup_name="$(basename "$backup_path")"
-            if [[ "$backup_name" =~ ^backup_[0-9]{8}_[0-9]{6}_[A-Za-z0-9]{6,8}$ ]]; then
+            if [ -f "$backup_path/.installer-backup" ]; then
                 printf '%s\n' "$backup_path"
             fi
         done < <(find "$CLASH_DIR" -maxdepth 1 -type d -name 'backup_*' -print 2>/dev/null)
@@ -128,12 +127,18 @@ sync_profile_bound_files() {
     [ -f "$profiles_yaml" ] || return 0
 
     awk '
+        NR == 1 { sub(/^\357\273\277/, "") }
         function clean_scalar(value) {
             sub(/^[[:space:]]*/, "", value)
-            sub(/[[:space:]]+#.*$/, "", value)
-            sub(/[[:space:]]*$/, "", value)
             if (value ~ /^".*"$/ || value ~ /^\047.*\047$/) {
                 value = substr(value, 2, length(value) - 2)
+            } else {
+                sub(/[[:space:]]+#.*$/, "", value)
+                sub(/^[[:space:]]*/, "", value)
+                sub(/[[:space:]]*$/, "", value)
+                if (value ~ /^".*"$/ || value ~ /^\047.*\047$/) {
+                    value = substr(value, 2, length(value) - 2)
+                }
             }
             return value
         }
@@ -242,6 +247,8 @@ fi
 mkdir -p "$CLASH_DIR/profiles"
 
 BACKUP_DIR="$(mktemp -d "$CLASH_DIR/backup_${BACKUP_STAMP}_XXXXXX")"
+# 安装器标记：只有带此标记的备份才会被自动清理，手工备份（含碰巧同名目录）不受影响
+: > "$BACKUP_DIR/.installer-backup"
 CREATED_FILES_LIST="$BACKUP_DIR/created-files.txt"
 : > "$CREATED_FILES_LIST"
 

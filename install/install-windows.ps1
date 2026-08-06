@@ -116,6 +116,19 @@ function Require-File {
 }
 
 try {
+    # Ctrl+C aborts roll back (mirrors the macOS EXIT trap).
+    # If registration fails on a rare PowerShell version, only Ctrl+C rollback is lost.
+    try {
+        [Console]::add_CancelKeyPress({
+            param($sender, $eventArgs)
+            $eventArgs.Cancel = $true
+            Restore-FromBackup
+            [Environment]::Exit(1)
+        })
+    } catch {
+        $null = $_
+    }
+
     $scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
     $parentDir = Split-Path -Parent $scriptDir
     $configDir = Join-Path $parentDir 'config'
@@ -165,6 +178,8 @@ try {
         $candidate = Join-Path $script:ClashDir ("backup_{0}_{1}" -f $timestamp, (Get-Random -Minimum 10000000 -Maximum 99999999))
         if (-not (Test-Path -LiteralPath $candidate)) {
             New-Item -ItemType Directory -Path $candidate -ErrorAction Stop | Out-Null
+            # Installer marker: only backups with this marker are auto-cleaned
+            $null = New-Item -ItemType File -Path (Join-Path $candidate '.installer-backup') -Force
             $script:BackupDir = $candidate
             break
         }
@@ -212,7 +227,7 @@ try {
 
     $script:InstallCompleted = $true
     $oldBackups = Get-ChildItem -LiteralPath $script:ClashDir -Directory -Filter 'backup_*' -ErrorAction SilentlyContinue |
-        Where-Object { $_.Name -match '^backup_[0-9]{8}_[0-9]{6}_[A-Za-z0-9]{6,8}$' } |
+        Where-Object { Test-Path -LiteralPath (Join-Path $_.FullName '.installer-backup') -PathType Leaf } |
         Sort-Object Name -Descending |
         Select-Object -Skip 5
     $cleanupCount = 0

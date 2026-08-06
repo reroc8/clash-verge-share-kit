@@ -1,5 +1,13 @@
 # Changelog
 
+## v0.3.21
+
+- Windows 安装器注册 Ctrl+C 中断处理：中断时自动回滚（对应 macOS 的 EXIT trap）；个别 PowerShell 版本注册失败仅失去中断回滚能力，不影响安装。
+- 修复 profiles.yaml 解析：引号包裹的 `file` 值内部的 `#` 不再被误当作行尾注释剥离（macOS / Windows 一致），如 `file: "a#b.yaml"`。
+- macOS 同步解析兼容 UTF-8 BOM 首行，带 BOM 的 profiles.yaml 不再跳过首个订阅绑定。
+- 备份目录增加 `.installer-backup` 标记：自动清理只删除安装器创建的备份，碰巧与自动备份同名的目录或手工备份不再被误删（macOS / Windows 一致）。
+- 安装器回归测试补充：BOM 首行、引号内 `#`、备份标记清理与同名碰撞保留、Ctrl+C 静态守护。
+
 ## v0.3.20
 
 - 修复 compact 模式未检测 `listeners` / `tunnels` / `ntp` 对自定义策略组的引用，此类订阅压缩后仍会生成悬空组的问题（补齐 README 承诺的检测范围）。

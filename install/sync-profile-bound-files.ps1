@@ -26,7 +26,14 @@ function ConvertFrom-YamlScalar {
     param([string] $Value)
 
     if ($null -eq $Value) { return '' }
-    $clean = ($Value -replace '\s+#.*$', '').Trim()
+    $trimmed = $Value.Trim()
+    if ($trimmed.Length -ge 2) {
+        if (($trimmed.StartsWith('"') -and $trimmed.EndsWith('"')) -or
+            ($trimmed.StartsWith("'") -and $trimmed.EndsWith("'"))) {
+            return $trimmed.Substring(1, $trimmed.Length - 2)
+        }
+    }
+    $clean = ($trimmed -replace '\s+#.*$', '').Trim()
     if ($clean.Length -ge 2) {
         if (($clean.StartsWith('"') -and $clean.EndsWith('"')) -or
             ($clean.StartsWith("'") -and $clean.EndsWith("'"))) {
