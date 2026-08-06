@@ -56,8 +56,10 @@ backup_existing_file() {
     backup_name="$2"
 
     if [ -f "$src" ]; then
-        if [ ! -f "$BACKUP_DIR/$backup_name" ]; then
-            cp "$src" "$BACKUP_DIR/$backup_name"
+        backup_path="$BACKUP_DIR/$backup_name"
+        if [ ! -f "$backup_path" ]; then
+            mkdir -p "$(dirname "$backup_path")"
+            cp "$src" "$backup_path"
         fi
     elif [ -n "${CREATED_FILES_LIST:-}" ]; then
         if ! grep -Fqx -- "$src" "$CREATED_FILES_LIST" 2>/dev/null; then
@@ -88,26 +90,24 @@ restore_from_backup() {
     fi
 
     restored_count=0
-    for backup_file in "$BACKUP_DIR"/*; do
-        [ -f "$backup_file" ] || continue
-        file_name="$(basename "$backup_file")"
-        case "$file_name" in
-            created-files.txt)
-                continue
-                ;;
-            verge.yaml|dns_config.yaml)
-                restore_path="$CLASH_DIR/$file_name"
-                ;;
-            *)
-                restore_path="$CLASH_DIR/profiles/$file_name"
-                ;;
-        esac
-
-        if cp "$backup_file" "$restore_path"; then
-            restored_count=$((restored_count + 1))
-        else
-            echo "警告: 恢复失败: $restore_path"
-        fi
+    for restore_scope in root profiles; do
+        scope_dir="$BACKUP_DIR/$restore_scope"
+        [ -d "$scope_dir" ] || continue
+        while IFS= read -r backup_file; do
+            [ -f "$backup_file" ] || continue
+            relative_path="${backup_file#"$scope_dir/"}"
+            if [ "$restore_scope" = "root" ]; then
+                restore_path="$CLASH_DIR/$relative_path"
+            else
+                restore_path="$CLASH_DIR/profiles/$relative_path"
+            fi
+            mkdir -p "$(dirname "$restore_path")"
+            if cp "$backup_file" "$restore_path"; then
+                restored_count=$((restored_count + 1))
+            else
+                echo "警告: 恢复失败: $restore_path"
+            fi
+        done < <(find "$scope_dir" -type f -print)
     done
 
     echo ">>> 已尝试恢复 $restored_count 个备份文件"
@@ -128,40 +128,77 @@ sync_profile_bound_files() {
     [ -f "$profiles_yaml" ] || return 0
 
     awk '
-        /^[[:space:]]*-[[:space:]]*uid:/ { item_type = "" }
-        /^[[:space:]]*type:/ {
-            item_type = ""
-            type_value = $0
-            sub(/^[[:space:]]*type:[[:space:]]*/, "", type_value)
-            sub(/[[:space:]]*$/, "", type_value)
-            if (type_value == "merge" || type_value == "script") {
-                item_type = type_value
+        function clean_scalar(value) {
+            sub(/^[[:space:]]*/, "", value)
+            sub(/[[:space:]]+#.*$/, "", value)
+            sub(/[[:space:]]*$/, "", value)
+            if (value ~ /^".*"$/ || value ~ /^\047.*\047$/) {
+                value = substr(value, 2, length(value) - 2)
             }
+            return value
+        }
+        function emit_item() {
+            if (!in_item) {
+                return
+            }
+            if (item_type == "merge" || item_type == "script") {
+                if (file_name != "") {
+                    print item_type "\t" file_name
+                } else {
+                    skipped_item = 1
+                }
+            }
+        }
+        function reset_item() {
+            in_item = 0
+            item_type = ""
+            file_name = ""
+        }
+        /^-[[:space:]]*uid[[:space:]]*:/ {
+            emit_item()
+            reset_item()
+            in_item = 1
             next
         }
-        /^[[:space:]]*file:[[:space:]]*/ {
-            current_item_type = item_type
-            item_type = ""
-            file = $0
-            sub(/^[[:space:]]*file:[[:space:]]*/, "", file)
-            sub(/[[:space:]]*$/, "", file)
-            if (file ~ /^".*"$/) {
-                sub(/^"/, "", file)
-                sub(/"$/, "", file)
-            }
-            if (file ~ /^\047.*\047$/) {
-                sub(/^\047/, "", file)
-                sub(/\047$/, "", file)
-            }
-            if (current_item_type == "merge" || current_item_type == "script") {
-                print current_item_type "\t" file
+        /^-[[:space:]]*/ {
+            emit_item()
+            reset_item()
+            skipped_item = 1
+            next
+        }
+        /^[[:space:]]+-[[:space:]]*(uid|type|file|\{)/ {
+            emit_item()
+            reset_item()
+            skipped_item = 1
+            next
+        }
+        in_item && /^  type[[:space:]]*:/ {
+            type_value = $0
+            sub(/^  type[[:space:]]*:[[:space:]]*/, "", type_value)
+            type_value = clean_scalar(type_value)
+            item_type = type_value
+            next
+        }
+        in_item && /^  file[[:space:]]*:/ {
+            file_value = $0
+            sub(/^  file[[:space:]]*:[[:space:]]*/, "", file_value)
+            file_name = clean_scalar(file_value)
+            next
+        }
+        END {
+            emit_item()
+            if (skipped_item) {
+                print "警告: profiles.yaml 含非标准条目，已跳过；仅支持 Clash Verge 生成的 - uid: 结构" > "/dev/stderr"
             }
         }
     ' "$profiles_yaml" | while IFS=$'\t' read -r item_type file_name; do
         case "$file_name" in
-            ""|/*|*..*|*\\*) continue ;;
+            ""|/*|*/*|*..*|*\\*)
+                echo "警告: 跳过异常的订阅绑定文件名: $file_name"
+                continue
+                ;;
         esac
-        backup_existing_file "$CLASH_DIR/profiles/$file_name" "$file_name"
+        backup_existing_file "$CLASH_DIR/profiles/$file_name" "profiles/$file_name"
         if [ "$item_type" = "merge" ]; then
             cp "$CONFIG_DIR/Merge.yaml" "$CLASH_DIR/profiles/$file_name"
         elif [ "$item_type" = "script" ]; then
@@ -210,13 +247,10 @@ CREATED_FILES_LIST="$BACKUP_DIR/created-files.txt"
 
 echo ">>> 安装前备份到: $BACKUP_DIR"
 
-for file in "Merge.yaml" "Script.js" "verge.yaml" "dns_config.yaml"; do
-    if [ "$file" = "Merge.yaml" ] || [ "$file" = "Script.js" ]; then
-        backup_existing_file "$CLASH_DIR/profiles/$file" "$file"
-    else
-        backup_existing_file "$CLASH_DIR/$file" "$file"
-    fi
-done
+backup_existing_file "$CLASH_DIR/profiles/Merge.yaml" "profiles/Merge.yaml"
+backup_existing_file "$CLASH_DIR/profiles/Script.js" "profiles/Script.js"
+backup_existing_file "$CLASH_DIR/verge.yaml" "root/verge.yaml"
+backup_existing_file "$CLASH_DIR/dns_config.yaml" "root/dns_config.yaml"
 
 echo ">>> 正在安装..."
 INSTALL_STARTED=1
@@ -233,8 +267,8 @@ echo ""
 echo ">>> 安装完成。你的订阅和节点数据未被修改。"
 echo ">>> 原文件已备份到: $BACKUP_DIR"
 echo ">>> 如需还原: 完全退出 Clash Verge Rev 后，把备份目录里的文件复制回对应位置"
-echo ">>>   Merge.yaml / Script.js / 其它随机 .yaml .js -> $CLASH_DIR/profiles/"
-echo ">>>   verge.yaml / dns_config.yaml -> $CLASH_DIR/"
+echo ">>>   backup/.../profiles/ -> $CLASH_DIR/profiles/"
+echo ">>>   backup/.../root/ -> $CLASH_DIR/"
 echo ">>> 配置文件已写入，并已同步已有订阅绑定的 merge/script 文件"
 echo ">>> 重新打开 Clash Verge Rev 后即生效"
 echo ">>> 安装后确认: 代理页能看到 Claude / AI / Google / YouTube / Telegram / Exchange / US / TW / SG / HK / JP / Proxies"

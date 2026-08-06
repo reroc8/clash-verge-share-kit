@@ -1,4 +1,5 @@
 const assert = require("assert");
+const childProcess = require("child_process");
 const fs = require("fs");
 const path = require("path");
 const vm = require("vm");
@@ -66,6 +67,20 @@ function groupByName(config, name) {
     rules: ["SUB-RULE,(NETWORK,TCP),custom", "MATCH,DIRECT"]
   });
   assert(groupByName(subRuleOutput, "Custom"), "sub-rule target must survive compact mode");
+}
+
+{
+  const output = run({
+    proxies: [
+      { name: "US-Chain", "dialer-proxy": "Custom" },
+      { name: "US-Base" }
+    ],
+    "proxy-groups": [{ name: "Custom", type: "select", proxies: ["US-Base"] }],
+    rules: ["MATCH,DIRECT"]
+  });
+
+  assert(groupByName(output, "Custom"), "dialer-proxy dependencies must survive compact mode");
+  assert.strictEqual(output.proxies[0]["dialer-proxy"], "Custom");
 }
 
 {
@@ -158,10 +173,21 @@ function groupByName(config, name) {
   const output = run({
     proxies: [{ name: "US-A" }, { name: "TW-A" }, { name: "SG-A" }],
     "proxy-groups": [],
-    rules: ["DOMAIN,example.test,DIRECT"]
+    rules: [
+      "DOMAIN,api.okx.com,DIRECT",
+      "DOMAIN-SUFFIX,OKX.COM,DIRECT",
+      "AND,((DOMAIN-SUFFIX,bybit.com),(NETWORK,TCP)),DIRECT",
+      "MATCH,DIRECT"
+    ]
   });
 
-  assert(output.rules[0].startsWith("DOMAIN-SUFFIX,okx.com,"), "exchange rules must be inserted before narrow-only rules");
+  const exactRuleIndex = output.rules.indexOf("DOMAIN,api.okx.com,DIRECT");
+  const logicalRuleIndex = output.rules.indexOf("AND,((DOMAIN-SUFFIX,bybit.com),(NETWORK,TCP)),DIRECT");
+  const exchangeRuleIndex = output.rules.findIndex((rule) => rule.startsWith("DOMAIN-SUFFIX,okx.com,"));
+  assert.strictEqual(exactRuleIndex, 0, "specific subscription rules must keep their original priority");
+  assert(logicalRuleIndex < exchangeRuleIndex, "specific logical rules must be allowed to override automatic Exchange routing");
+  assert(exactRuleIndex < exchangeRuleIndex, "exact subscription rules must be allowed to override automatic Exchange routing");
+  assert(!output.rules.includes("DOMAIN-SUFFIX,OKX.COM,DIRECT"), "case variants of managed exchange rules must be deduplicated");
 }
 
 {
@@ -177,8 +203,10 @@ function groupByName(config, name) {
   });
 
   const exchangeIndex = output.rules.findIndex((rule) => rule.startsWith("DOMAIN-SUFFIX,okx.com,"));
+  const serviceIndex = output.rules.indexOf("DOMAIN-SUFFIX,service.example,Proxies");
   const cnIndex = output.rules.indexOf("RULE-SET,cn-domain,DIRECT");
-  assert(exchangeIndex > 0 && exchangeIndex < cnIndex, "exchange rules must stay before the new domestic/global base layers");
+  assert(serviceIndex < exchangeIndex, "narrow subscription rules must keep priority over automatic Exchange rules");
+  assert(exchangeIndex < cnIndex, "exchange rules must stay before the new domestic/global base layers");
   for (const domain of ["okx-dns1.com", "okx-dns2.com", "bybit-global.com", "binanceapi.com"]) {
     assert(
       output.rules.includes(`DOMAIN-SUFFIX,${domain},Exchange`),
@@ -189,6 +217,9 @@ function groupByName(config, name) {
 
 {
   const requiredBusinessRules = [
+    "DOMAIN,anthropic.auth0.com,Claude",
+    "DOMAIN,anthropic-com.ghost.io,Claude",
+    "DOMAIN,anthropic.com.cdn.cloudflare.net,Claude",
     "DOMAIN-SUFFIX,clau.de,Claude",
     "DOMAIN-SUFFIX,claudeusercontent.com,Claude",
     "DOMAIN,openaiassets.blob.core.windows.net,AI",
@@ -206,6 +237,13 @@ function groupByName(config, name) {
   assert(applicationsIndex > 0, "applications rule must exist");
   assert(applicationsIndex < cnDomainIndex, "applications must run before the domestic base layer");
   assert(applicationsIndex < globalDomainIndex, "applications must run before the global base layer");
+  for (const domain of ["t.me", "telegra.ph", "telegram-cdn.org", "telegram.org", "telesco.pe"]) {
+    assert(
+      mergeSource.includes(`- DOMAIN-SUFFIX,${domain},Telegram`),
+      `${domain} must use the Telegram group`
+    );
+  }
+  assert(mergeSource.includes("- RULE-SET,telegramcidr,Telegram,no-resolve"), "existing Telegram CIDR routing must remain enabled");
 }
 
 {
@@ -231,6 +269,131 @@ function groupByName(config, name) {
 
   assert(output.rules.includes("AND,((DOMAIN,example.test),(NETWORK,TCP)),Proxies Group"), "logical rule target must follow the allocated managed group name");
   assert(!output.rules.some((rule) => rule.includes("ads.example.test")), "logical reject rule must be removed with other reject rules");
+}
+
+{
+  const output = run({
+    proxies: [{ name: "US-A" }],
+    "proxy-groups": [{ name: "proxies", type: "select", proxies: ["US-A"] }],
+    "sub-rules": {
+      custom: ["DOMAIN,example.test,Proxies"]
+    },
+    rules: ["SUB-RULE,(NETWORK,TCP),custom", "MATCH,DIRECT"]
+  });
+
+  assert.deepStrictEqual(output["sub-rules"].custom, ["DOMAIN,example.test,proxies"]);
+  assert(output.rules.includes("SUB-RULE,(NETWORK,TCP),custom"));
+}
+
+{
+  const output = run({
+    proxies: [{ name: "AI" }, { name: "US-A" }, { name: "TW-A" }],
+    "proxy-groups": [],
+    "rule-providers": {
+      reject: { type: "inline", behavior: "domain", payload: ["ads.test"] }
+    },
+    "sub-rules": {
+      AI: ["DOMAIN,example.test,AI"],
+      REJECT: ["DOMAIN,keep.example.test,DIRECT", "RULE-SET,reject,REJECT"]
+    },
+    rules: [
+      "SUB-RULE,(NETWORK,TCP),AI",
+      "SUB-RULE,(NETWORK,UDP),REJECT",
+      "MATCH,DIRECT"
+    ]
+  });
+
+  assert(output.rules.includes("SUB-RULE,(NETWORK,TCP),AI"), "sub-rule names must not be rewritten as managed groups");
+  assert(output.rules.includes("SUB-RULE,(NETWORK,UDP),REJECT"), "sub-rules named REJECT must not be removed");
+  assert.deepStrictEqual(output["sub-rules"].AI, ["DOMAIN,example.test,AI Group"]);
+  assert.deepStrictEqual(output["sub-rules"].REJECT, ["DOMAIN,keep.example.test,DIRECT"]);
+  assert.strictEqual(output["rule-providers"].reject, undefined, "reject rule providers must keep the package's no-ad-block design");
+}
+
+{
+  const output = run({
+    proxies: [
+      { name: "Brazil South America" },
+      { name: "Argentina Latin America" },
+      { name: "US Los Angeles" }
+    ],
+    "proxy-groups": [],
+    rules: ["MATCH,DIRECT"]
+  });
+
+  assert.deepStrictEqual(groupByName(output, "US").proxies, ["US Los Angeles"]);
+}
+
+{
+  const output = run({
+    proxies: [{ name: "constructor" }, { name: "toString" }, { name: "__proto__" }],
+    "proxy-groups": [],
+    rules: ["MATCH,DIRECT"]
+  });
+
+  assert.deepStrictEqual(
+    groupByName(output, "Proxies").proxies.slice(0, 3),
+    ["constructor", "toString", "__proto__"],
+    "Object.prototype names must remain selectable"
+  );
+}
+
+if (process.env.MIHOMO_BIN) {
+  const httpProxy = (name, port, extra = {}) => ({
+    name,
+    type: "http",
+    server: "127.0.0.1",
+    port,
+    ...extra
+  });
+  const mihomoCases = [
+    {
+      name: "dialer-proxy compact dependency",
+      config: {
+        proxies: [
+          httpProxy("US-Chain", 18080, { "dialer-proxy": "Custom" }),
+          httpProxy("US-Base", 18081)
+        ],
+        "proxy-groups": [{ name: "Custom", type: "select", proxies: ["US-Base"] }],
+        rules: ["MATCH,DIRECT"]
+      }
+    },
+    {
+      name: "sub-rule managed target casing",
+      config: {
+        proxies: [httpProxy("US-A", 18082)],
+        "proxy-groups": [{ name: "proxies", type: "select", proxies: ["US-A"] }],
+        "sub-rules": { custom: ["DOMAIN,example.test,Proxies"] },
+        rules: ["SUB-RULE,(NETWORK,TCP),custom", "MATCH,DIRECT"]
+      }
+    },
+    {
+      name: "sub-rule named REJECT",
+      config: {
+        proxies: [httpProxy("US-A", 18083)],
+        "proxy-groups": [],
+        "rule-providers": {
+          reject: { type: "inline", behavior: "domain", payload: ["+.ads.test"] }
+        },
+        "sub-rules": { REJECT: ["DOMAIN,keep.example.test,DIRECT", "RULE-SET,reject,REJECT"] },
+        rules: ["SUB-RULE,(NETWORK,TCP),REJECT", "MATCH,DIRECT"]
+      }
+    }
+  ];
+
+  for (const testCase of mihomoCases) {
+    const output = run(testCase.config);
+    const encoded = Buffer.from(JSON.stringify(output), "utf8").toString("base64");
+    const result = childProcess.spawnSync(process.env.MIHOMO_BIN, ["-t", "-config", encoded], {
+      encoding: "utf8"
+    });
+    assert.strictEqual(
+      result.status,
+      0,
+      `${testCase.name} must pass Mihomo validation:\n${result.stdout || ""}${result.stderr || ""}`
+    );
+  }
+  console.log(`Mihomo configuration tests passed: ${mihomoCases.length}`);
 }
 
 console.log("Script.js regression tests passed");

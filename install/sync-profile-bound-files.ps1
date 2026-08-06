@@ -22,6 +22,20 @@ function Require-Directory {
     }
 }
 
+function ConvertFrom-YamlScalar {
+    param([string] $Value)
+
+    if ($null -eq $Value) { return '' }
+    $clean = ($Value -replace '\s+#.*$', '').Trim()
+    if ($clean.Length -ge 2) {
+        if (($clean.StartsWith('"') -and $clean.EndsWith('"')) -or
+            ($clean.StartsWith("'") -and $clean.EndsWith("'"))) {
+            $clean = $clean.Substring(1, $clean.Length - 2)
+        }
+    }
+    return $clean
+}
+
 try {
     Require-Directory 'ClashDir' $ClashDir
     Require-Directory 'ConfigDir' $ConfigDir
@@ -38,57 +52,86 @@ try {
         exit 0
     }
 
-    $script:ItemType = $null
     $script:SyncedCount = 0
+    $items = New-Object System.Collections.Generic.List[object]
+    $currentType = $null
+    $currentFile = $null
+    $haveItem = $false
+    $skippedMalformedItem = $false
+    $flushItem = {
+        if ($haveItem -and ($currentType -eq 'merge' -or $currentType -eq 'script') -and
+            -not [string]::IsNullOrWhiteSpace($currentFile)) {
+            $items.Add([pscustomobject]@{ Type = $currentType; File = $currentFile })
+        } elseif ($haveItem -and ($currentType -eq 'merge' -or $currentType -eq 'script')) {
+            Write-Host 'Warning: skipped a merge/script profile item without a file field'
+        }
+    }
 
-    Get-Content -LiteralPath $profilesYaml -Encoding UTF8 -ErrorAction Stop | ForEach-Object {
-        $line = $_
-
-        if ($line -match '^\s*-\s*uid:') {
-            $script:ItemType = $null
-            return
+    foreach ($line in (Get-Content -LiteralPath $profilesYaml -Encoding UTF8 -ErrorAction Stop)) {
+        if ($line -match '^-\s*uid\s*:') {
+            & $flushItem
+            $currentType = $null
+            $currentFile = $null
+            $haveItem = $true
+            continue
         }
 
-        if ($line -match '^\s*type:\s*(.*?)\s*$') {
-            $candidateType = $Matches[1].Trim()
-            $script:ItemType = $null
-            if ($candidateType -eq 'merge' -or $candidateType -eq 'script') {
-                $script:ItemType = $candidateType
-            }
-            return
+        if ($line -match '^-\s*' -or $line -match '^\s+-\s*(?:uid|type|file|\{)') {
+            & $flushItem
+            $currentType = $null
+            $currentFile = $null
+            $haveItem = $false
+            $skippedMalformedItem = $true
+            continue
         }
 
-        if ($line -match '^\s*file:\s*(.+?)\s*$' -and ($script:ItemType -eq 'merge' -or $script:ItemType -eq 'script')) {
-            $currentItemType = $script:ItemType
-            $script:ItemType = $null
-            $file = $Matches[1].Trim().Trim([char]34).Trim([char]39)
-            if ([string]::IsNullOrWhiteSpace($file) -or $file -match '[\\/:]' -or $file -match '\.\.') {
-                return
-            }
-
-            $dst = Join-Path $profiles $file
-            $backupDst = Join-Path $BackupDir $file
-
-            if (Test-Path -LiteralPath $dst) {
-                if (-not (Test-Path -LiteralPath $backupDst)) {
-                    Copy-Item -LiteralPath $dst -Destination $backupDst -Force -ErrorAction Stop
-                }
-            } else {
-                $createdFiles = @(Get-Content -LiteralPath $createdFilesList -Encoding UTF8 -ErrorAction SilentlyContinue)
-                if ($createdFiles -notcontains $dst) {
-                    [System.IO.File]::AppendAllText($createdFilesList, $dst + [Environment]::NewLine, [System.Text.Encoding]::UTF8)
-                }
-            }
-
-            if ($currentItemType -eq 'merge') {
-                $src = Join-Path $ConfigDir 'Merge.yaml'
-            } else {
-                $src = Join-Path $ConfigDir 'Script.js'
-            }
-
-            Copy-Item -LiteralPath $src -Destination $dst -Force -ErrorAction Stop
-            $script:SyncedCount += 1
+        if (-not $haveItem) { continue }
+        if ($line -match '^  type\s*:\s*(.*?)\s*$') {
+            $currentType = ConvertFrom-YamlScalar $Matches[1]
+            continue
         }
+        if ($line -match '^  file\s*:\s*(.*?)\s*$') {
+            $currentFile = ConvertFrom-YamlScalar $Matches[1]
+        }
+    }
+    & $flushItem
+
+    if ($skippedMalformedItem) {
+        Write-Host 'Warning: skipped non-standard profiles.yaml entries; only Clash Verge - uid: items are supported'
+    }
+
+    foreach ($item in $items) {
+        $file = $item.File
+        if ([string]::IsNullOrWhiteSpace($file) -or $file -match '[\\/:]' -or $file -match '\.\.') {
+            continue
+        }
+
+        $dst = Join-Path $profiles $file
+        $backupProfilesDir = Join-Path $BackupDir 'profiles'
+        if (-not (Test-Path -LiteralPath $backupProfilesDir -PathType Container)) {
+            New-Item -ItemType Directory -Path $backupProfilesDir -Force -ErrorAction Stop | Out-Null
+        }
+        $backupDst = Join-Path $backupProfilesDir $file
+
+        if (Test-Path -LiteralPath $dst) {
+            if (-not (Test-Path -LiteralPath $backupDst)) {
+                Copy-Item -LiteralPath $dst -Destination $backupDst -Force -ErrorAction Stop
+            }
+        } else {
+            $createdFiles = @(Get-Content -LiteralPath $createdFilesList -Encoding UTF8 -ErrorAction SilentlyContinue)
+            if ($createdFiles -notcontains $dst) {
+                [System.IO.File]::AppendAllText($createdFilesList, $dst + [Environment]::NewLine, [System.Text.Encoding]::UTF8)
+            }
+        }
+
+        if ($item.Type -eq 'merge') {
+            $src = Join-Path $ConfigDir 'Merge.yaml'
+        } else {
+            $src = Join-Path $ConfigDir 'Script.js'
+        }
+
+        Copy-Item -LiteralPath $src -Destination $dst -Force -ErrorAction Stop
+        $script:SyncedCount += 1
     }
 
     Write-Host "Synced profile-bound merge/script files: $script:SyncedCount"

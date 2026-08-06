@@ -105,6 +105,10 @@ rules:
   - DOMAIN-SUFFIX,oauth2.googleapis.com,Google
   - DOMAIN-SUFFIX,oauth2.googleusercontent.com,Google
   # Claude is isolated to a US-only group
+  # Shared Auth0 / Ghost / Cloudflare suffixes are intentionally not used.
+  - DOMAIN,anthropic.auth0.com,Claude
+  - DOMAIN,anthropic-com.ghost.io,Claude
+  - DOMAIN,anthropic.com.cdn.cloudflare.net,Claude
   - DOMAIN,servd-anthropic-website.b-cdn.net,Claude
   - DOMAIN-SUFFIX,clau.de,Claude
   - DOMAIN-SUFFIX,claude.ai,Claude
@@ -280,7 +284,19 @@ rules:
   - DOMAIN-SUFFIX,yt3.ggpht.com,YouTube
   # Google 生态
   - RULE-SET,google,Google
-  # Telegram
+  # Telegram domains plus the existing official IP ranges
+  - DOMAIN-SUFFIX,cdn-telegram.org,Telegram
+  - DOMAIN-SUFFIX,legra.ph,Telegram
+  - DOMAIN-SUFFIX,t.me,Telegram
+  - DOMAIN-SUFFIX,tdesktop.com,Telegram
+  - DOMAIN-SUFFIX,telegra.ph,Telegram
+  - DOMAIN-SUFFIX,telegram-cdn.org,Telegram
+  - DOMAIN-SUFFIX,telegram.dog,Telegram
+  - DOMAIN-SUFFIX,telegram.me,Telegram
+  - DOMAIN-SUFFIX,telegram.org,Telegram
+  - DOMAIN-SUFFIX,telegram.space,Telegram
+  - DOMAIN-SUFFIX,telegramdownload.com,Telegram
+  - DOMAIN-SUFFIX,telesco.pe,Telegram
   - RULE-SET,telegramcidr,Telegram,no-resolve
   # Business rules stay first. Generic application bypass only runs before the
   # domestic/global base layers, so AI and exchange routing keep priority.

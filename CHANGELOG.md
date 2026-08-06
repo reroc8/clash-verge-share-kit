@@ -1,6 +1,16 @@
 # Changelog
 
-## Unreleased
+## v0.3.19
+
+- 修复 compact 模式遗漏 `dialer-proxy` 等策略组引用、再次生成悬空组的问题。
+- 修复 `SUB-RULE` 入口名称被误改写、子规则内容未同步改写，以及用户 `REJECT` 规则被全局删除的问题。
+- 交易所规则调整为最高优先级；美国节点识别不再把 South / Latin America 误判为 US。
+- Telegram 改用同时覆盖域名和 IP 的完整规则集，确保网页与客户端都进入 `Telegram` 组。
+- Claude 补充精确基础域名（`anthropic.auth0.com`、`anthropic-com.ghost.io`、`anthropic.com.cdn.cloudflare.net`），不引入共享 Auth0 / Ghost / Cloudflare 后缀以免误伤其他服务。
+- `Script.js` 内部映射改用无原型对象并显式做 `hasOwnProperty` 检查，避免 `__proto__`、`constructor` 等原型键被误当作组名或节点名。
+- macOS / Windows 备份按 `root/` 与 `profiles/` 分层保存，避免同名文件覆盖；同步解析兼容字段换序、引号、注释和内联映射。
+- 敏感扫描改为覆盖整个仓库及最终打包目录，并识别内联 YAML / JSON、凭据字段和节点 URI；豁免测试夹具中的本地回环 `server` 地址（`127.0.0.1` / `localhost` 等）。
+- 发布门禁增加 YAML、真实 Mihomo、安装器安装与回滚路径和可用时的 PowerShell 验证；ZIP 完成自检后再原子替换正式文件。
 
 ## v0.3.18
 
