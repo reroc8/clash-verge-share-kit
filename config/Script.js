@@ -29,9 +29,6 @@ function main(config, profileName) {
   }
 
   var ruleProviders = config["rule-providers"];
-  if (ruleProviders && hasOwn(ruleProviders, "reject")) {
-    delete ruleProviders.reject;
-  }
 
   var rawGroups = Array.isArray(config["proxy-groups"]) ? config["proxy-groups"] : [];
   var groups = [];
@@ -286,6 +283,19 @@ function main(config, profileName) {
     }
   }
 
+  function lookupName(map, name) {
+    if (hasOwn(map, name)) {
+      return map[name];
+    }
+    var lowerName = normalizeName(name);
+    for (var key in map) {
+      if (hasOwn(map, key) && normalizeName(key) === lowerName) {
+        return map[key];
+      }
+    }
+    return undefined;
+  }
+
   function ruleReferencesCustomGroup(rule) {
     if (typeof rule !== "string") {
       return false;
@@ -299,7 +309,7 @@ function main(config, profileName) {
       return false;
     }
     var targetIndex = ruleType === "MATCH" || ruleType === "FINAL" ? 1 : 2;
-    return parts.length > targetIndex && hasOwn(originalCustomGroupNames, parts[targetIndex]);
+    return parts.length > targetIndex && lookupName(originalCustomGroupNames, parts[targetIndex]) !== undefined;
   }
 
   function ruleListReferencesCustomGroup(ruleList) {
@@ -347,6 +357,29 @@ function main(config, profileName) {
         customGroupIsReferenced = true;
         break;
       }
+    }
+  }
+  if (!customGroupIsReferenced && Array.isArray(config.listeners)) {
+    for (var listenerIndex = 0; listenerIndex < config.listeners.length; listenerIndex++) {
+      if (config.listeners[listenerIndex] &&
+          referencesCustomGroup(config.listeners[listenerIndex].proxy)) {
+        customGroupIsReferenced = true;
+        break;
+      }
+    }
+  }
+  if (!customGroupIsReferenced && Array.isArray(config.tunnels)) {
+    for (var tunnelIndex = 0; tunnelIndex < config.tunnels.length; tunnelIndex++) {
+      if (config.tunnels[tunnelIndex] &&
+          referencesCustomGroup(config.tunnels[tunnelIndex].proxy)) {
+        customGroupIsReferenced = true;
+        break;
+      }
+    }
+  }
+  if (!customGroupIsReferenced && config.ntp && typeof config.ntp === "object") {
+    if (referencesCustomGroup(config.ntp.proxy)) {
+      customGroupIsReferenced = true;
     }
   }
 
@@ -567,9 +600,12 @@ function main(config, profileName) {
       changed = true;
     }
     var targetIndex = ruleType === "MATCH" ? 1 : 2;
-    if (parts.length > targetIndex && managedTargetMap[parts[targetIndex]]) {
-      parts[targetIndex] = managedTargetMap[parts[targetIndex]];
-      changed = true;
+    if (parts.length > targetIndex) {
+      var mappedTarget = lookupName(managedTargetMap, parts[targetIndex]);
+      if (mappedTarget !== undefined) {
+        parts[targetIndex] = mappedTarget;
+        changed = true;
+      }
     }
     return changed ? parts.join(",") : rule;
   }
@@ -651,24 +687,6 @@ function main(config, profileName) {
     return type === "DOMAIN-SUFFIX" && exchangeDomainSet[domain] === true;
   }
 
-  function isRejectRule(rule) {
-    if (typeof rule !== "string") {
-      return false;
-    }
-    var parts = splitRuleParts(rule);
-    if (parts.length < 2) {
-      return false;
-    }
-    var type = String(parts[0] || "").toUpperCase();
-    if (type === "SUB-RULE") {
-      return false;
-    }
-    var targetIndex = type === "MATCH" || type === "FINAL" ? 1 : 2;
-    var providerName = String(parts[1] || "").toLowerCase();
-    var target = String(parts[targetIndex] || "").toUpperCase();
-    return target === "REJECT" || (type === "RULE-SET" && providerName === "reject");
-  }
-
   var exchangeRules = [];
   for (var er = 0; er < exchangeDomains.length; er++) {
     exchangeRules.push("DOMAIN-SUFFIX," + exchangeDomains[er] + "," + managedGroups.Exchange);
@@ -680,10 +698,7 @@ function main(config, profileName) {
     }
     var rewrittenRules = [];
     for (var ruleIndex = 0; ruleIndex < ruleList.length; ruleIndex++) {
-      var rewrittenRule = rewriteRuleTarget(ruleList[ruleIndex]);
-      if (!isRejectRule(rewrittenRule)) {
-        rewrittenRules.push(rewrittenRule);
-      }
+      rewrittenRules.push(rewriteRuleTarget(ruleList[ruleIndex]));
     }
     return rewrittenRules;
   }
@@ -700,7 +715,7 @@ function main(config, profileName) {
   var cleanedRules = [];
   for (var r = 0; r < rules.length; r++) {
     var rewrittenRule = rewriteRuleTarget(rules[r]);
-    if (!isManagedExchangeRule(rewrittenRule) && !isRejectRule(rewrittenRule)) {
+    if (!isManagedExchangeRule(rewrittenRule)) {
       cleanedRules.push(rewrittenRule);
     }
   }

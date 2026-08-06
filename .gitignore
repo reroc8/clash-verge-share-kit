@@ -6,3 +6,6 @@ dist/
 node_modules/
 .reasonix/
 reasonix.toml
+profiles.yaml
+*.pem
+*.key

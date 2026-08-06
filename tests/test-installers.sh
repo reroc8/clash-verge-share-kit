@@ -81,6 +81,13 @@ printf '%s\n' 'old root verge' > "$CLASH2_DIR/verge.yaml"
 printf '%s\n' 'old root dns' > "$CLASH2_DIR/dns_config.yaml"
 printf '%s\n' 'old default merge' > "$CLASH2_DIR/profiles/Merge.yaml"
 printf '%s\n' 'old default script' > "$CLASH2_DIR/profiles/Script.js"
+# 绑定一个安装前不存在的 merge 文件，验证 created-files 回滚删除
+printf '%s\n' \
+    'items:' \
+    '- uid: newbind' \
+    '  type: merge' \
+    '  file: new-merge.yaml' \
+    > "$CLASH2_DIR/profiles.yaml"
 
 RESTORE_LOG="$RESTORE_HOME/restore.log"
 PATH="$TMP_HOME/bin:$PATH" HOME="$RESTORE_HOME" bash "$KIT_DIR/install/install-macos.command" > "$RESTORE_LOG" 2>&1 && {
@@ -95,5 +102,30 @@ grep -Fqx 'old default merge' "$CLASH2_DIR/profiles/Merge.yaml"
 grep -Fqx 'old default script' "$CLASH2_DIR/profiles/Script.js"
 grep -Fqx 'old root verge' "$CLASH2_DIR/verge.yaml"
 grep -Fqx 'old root dns' "$CLASH2_DIR/dns_config.yaml"
+test ! -f "$CLASH2_DIR/profiles/new-merge.yaml" && echo "created file removed on rollback"
+
+# --- backup cleanup: keep newest 5 auto backups, keep manual backups ---
+CLEAN_HOME="$TMP_HOME/clean"
+CLASH3_DIR="$CLEAN_HOME/Library/Application Support/io.github.clash-verge-rev.clash-verge-rev"
+mkdir -p "$CLASH3_DIR/profiles"
+printf '%s\n' 'old root verge' > "$CLASH3_DIR/verge.yaml"
+printf '%s\n' 'old root dns' > "$CLASH3_DIR/dns_config.yaml"
+printf '%s\n' 'old default merge' > "$CLASH3_DIR/profiles/Merge.yaml"
+printf '%s\n' 'old default script' > "$CLASH3_DIR/profiles/Script.js"
+# 6 个旧自动备份 + 1 个手工备份；安装会新增 1 个自动备份
+for i in 1 2 3 4 5 6; do
+    mkdir -p "$CLASH3_DIR/backup_20260101_00000${i}_AAAAAA"
+    touch "$CLASH3_DIR/backup_20260101_00000${i}_AAAAAA/keep.txt"
+done
+mkdir -p "$CLASH3_DIR/backup_20260101_000000_manual_keep"
+touch "$CLASH3_DIR/backup_20260101_000000_manual_keep/keep.txt"
+
+CLEAN_LOG="$CLEAN_HOME/clean.log"
+PATH="$TMP_HOME/bin:$PATH" HOME="$CLEAN_HOME" bash "$ROOT_DIR/install/install-macos.command" > "$CLEAN_LOG" 2>&1
+
+STANDARD_COUNT="$(find "$CLASH3_DIR" -maxdepth 1 -type d -name 'backup_*' ! -name '*_manual_*' | wc -l | tr -d ' ')"
+MANUAL_COUNT="$(find "$CLASH3_DIR" -maxdepth 1 -type d -name 'backup_*_manual_*' | wc -l | tr -d ' ')"
+test "$STANDARD_COUNT" -eq 5 || { echo "expected 5 auto backups, got $STANDARD_COUNT"; exit 1; }
+test "$MANUAL_COUNT" -eq 1 || { echo "expected 1 manual backup to survive, got $MANUAL_COUNT"; exit 1; }
 
 echo "Installer regression tests passed"

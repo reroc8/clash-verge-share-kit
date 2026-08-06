@@ -1,5 +1,14 @@
 # Changelog
 
+## v0.3.20
+
+- 修复 compact 模式未检测 `listeners` / `tunnels` / `ntp` 对自定义策略组的引用，此类订阅压缩后仍会生成悬空组的问题（补齐 README 承诺的检测范围）。
+- 订阅自带的 `REJECT` 规则与 `reject` rule-provider 不再被全局删除，与路由设计文档声明一致；基础包自身仍不注入广告拦截规则。
+- 修复规则目标大小写变体（如 `MATCH,PROXIES`）未被改写导致悬空组、Mihomo 拒绝启动的问题；自定义组引用检测同样改为大小写不敏感。
+- 敏感扫描升级：识别节点 URI（`ss://`、`vmess://`、`vless://`、`trojan://`、`hysteria2://`、`tuic://`、`wireguard://`）、行内 JSON 键与 `secret` 凭据键；词边界避免 `nameserver` 等合法键误报；豁免范围明确为 tests/ 夹具与扫描器自指内容。
+- `.gitignore` 补充 `profiles.yaml`、`*.pem`、`*.key` 兜底，防止未来误提交。
+- 安装器回归测试补充 created-files 回滚删除与备份清理（保留 5 个自动备份、保留手工备份）路径。
+
 ## v0.3.19
 
 - 修复 compact 模式遗漏 `dialer-proxy` 等策略组引用、再次生成悬空组的问题。

@@ -254,7 +254,7 @@ function groupByName(config, name) {
   });
 
   assert(output.rules.includes("MATCH,Proxies Group"), "legacy FINAL rule must become a valid MATCH rule with the allocated group name");
-  assert(!output.rules.includes("MATCH,REJECT"), "legacy FINAL reject rule must be removed with other reject rules");
+  assert(output.rules.includes("MATCH,REJECT"), "user FINAL reject rule must be preserved");
 }
 
 {
@@ -268,7 +268,7 @@ function groupByName(config, name) {
   });
 
   assert(output.rules.includes("AND,((DOMAIN,example.test),(NETWORK,TCP)),Proxies Group"), "logical rule target must follow the allocated managed group name");
-  assert(!output.rules.some((rule) => rule.includes("ads.example.test")), "logical reject rule must be removed with other reject rules");
+  assert(output.rules.some((rule) => rule.includes("ads.example.test")), "user logical reject rule must be preserved");
 }
 
 {
@@ -306,8 +306,8 @@ function groupByName(config, name) {
   assert(output.rules.includes("SUB-RULE,(NETWORK,TCP),AI"), "sub-rule names must not be rewritten as managed groups");
   assert(output.rules.includes("SUB-RULE,(NETWORK,UDP),REJECT"), "sub-rules named REJECT must not be removed");
   assert.deepStrictEqual(output["sub-rules"].AI, ["DOMAIN,example.test,AI Group"]);
-  assert.deepStrictEqual(output["sub-rules"].REJECT, ["DOMAIN,keep.example.test,DIRECT"]);
-  assert.strictEqual(output["rule-providers"].reject, undefined, "reject rule providers must keep the package's no-ad-block design");
+  assert.deepStrictEqual(output["sub-rules"].REJECT, ["DOMAIN,keep.example.test,DIRECT", "RULE-SET,reject,REJECT"], "subscription reject rules inside sub-rules must be preserved");
+  assert(output["rule-providers"].reject, "subscription reject rule provider must be preserved");
 }
 
 {
@@ -336,6 +336,57 @@ function groupByName(config, name) {
     ["constructor", "toString", "__proto__"],
     "Object.prototype names must remain selectable"
   );
+}
+
+{
+  // listeners / tunnels / ntp 引用自定义策略组时，必须关闭压缩并保留原始组
+  {
+    const output = run({
+      proxies: [{ name: "US-A" }],
+      "proxy-groups": [{ name: "Custom", type: "select", proxies: ["US-A"] }],
+      listeners: [{ type: "socks", port: 7891, proxy: "Custom" }],
+      rules: ["MATCH,DIRECT"]
+    });
+    assert(groupByName(output, "Custom"), "listeners proxy reference must keep original groups");
+  }
+  {
+    const output = run({
+      proxies: [{ name: "US-A" }],
+      "proxy-groups": [{ name: "Custom", type: "select", proxies: ["US-A"] }],
+      tunnels: [{ network: ["tcp", "udp"], proxy: "Custom" }],
+      rules: ["MATCH,DIRECT"]
+    });
+    assert(groupByName(output, "Custom"), "tunnels proxy reference must keep original groups");
+  }
+  {
+    const output = run({
+      proxies: [{ name: "US-A" }],
+      "proxy-groups": [{ name: "Custom", type: "select", proxies: ["US-A"] }],
+      ntp: { enable: true, proxy: "Custom" },
+      rules: ["MATCH,DIRECT"]
+    });
+    assert(groupByName(output, "Custom"), "ntp proxy reference must keep original groups");
+  }
+}
+
+{
+  // 规则目标的大小写变体必须改写为实际组名
+  const output = run({
+    proxies: [{ name: "US-A" }],
+    "proxy-groups": [{ name: "proxies", type: "select", proxies: ["US-A"] }],
+    rules: ["MATCH,PROXIES"]
+  });
+  assert(output.rules.includes("MATCH,proxies"), "uppercase rule target must be rewritten case-insensitively");
+}
+
+{
+  // 自定义组名的大小写变体引用同样必须关闭压缩
+  const output = run({
+    proxies: [{ name: "US-A" }],
+    "proxy-groups": [{ name: "Custom", type: "select", proxies: ["US-A"] }],
+    rules: ["DOMAIN,example.test,CUSTOM"]
+  });
+  assert(groupByName(output, "Custom"), "case-variant custom group reference must disable compaction");
 }
 
 if (process.env.MIHOMO_BIN) {
