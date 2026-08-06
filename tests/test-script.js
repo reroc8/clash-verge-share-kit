@@ -207,12 +207,26 @@ function groupByName(config, name) {
   const cnIndex = output.rules.indexOf("RULE-SET,cn-domain,DIRECT");
   assert(serviceIndex < exchangeIndex, "narrow subscription rules must keep priority over automatic Exchange rules");
   assert(exchangeIndex < cnIndex, "exchange rules must stay before the new domestic/global base layers");
-  for (const domain of ["okx-dns1.com", "okx-dns2.com", "bybit-global.com", "binanceapi.com"]) {
+  for (const domain of ["okx-dns1.com", "okx-dns2.com", "bybit-global.com", "binanceapi.com", "bybit.ada.support"]) {
     assert(
       output.rules.includes(`DOMAIN-SUFFIX,${domain},Exchange`),
       `${domain} must stay inside the controlled Exchange group`
     );
   }
+}
+
+{
+  // 无兜底规则（无 MATCH/FINAL）时，用户具体规则仍须优先于自动注入的交易所规则
+  const output = run({
+    proxies: [{ name: "US-A" }, { name: "TW-A" }, { name: "SG-A" }],
+    "proxy-groups": [],
+    rules: ["DOMAIN-SUFFIX,service.example,Proxies"]
+  });
+
+  const serviceIndex = output.rules.indexOf("DOMAIN-SUFFIX,service.example,Proxies");
+  const exchangeIndex = output.rules.findIndex((rule) => rule.startsWith("DOMAIN-SUFFIX,okx.com,"));
+  assert(serviceIndex !== -1 && exchangeIndex !== -1, "user rule and managed exchange rule must both exist");
+  assert(serviceIndex < exchangeIndex, "without a catch-all rule, exchange rules must be appended after user rules");
 }
 
 {
@@ -244,6 +258,22 @@ function groupByName(config, name) {
     );
   }
   assert(mergeSource.includes("- RULE-SET,telegramcidr,Telegram,no-resolve"), "existing Telegram CIDR routing must remain enabled");
+}
+
+{
+  // Merge.yaml 中每条 RULE-SET 引用的 provider 必须都有定义，避免规则指向不存在的下载源
+  const providerNames = new Set(
+    (mergeSource.match(/^  ([a-zA-Z0-9_-]+):\s*$/gm) || [])
+      .map((line) => line.trim().replace(/:$/, ""))
+  );
+  assert(providerNames.size >= 10, "expected rule-providers to be defined in Merge.yaml");
+  const referenced = new Set(
+    (mergeSource.match(/RULE-SET,([a-zA-Z0-9_-]+),/g) || [])
+      .map((token) => token.replace(/^RULE-SET,/, "").replace(/,.*$/, ""))
+  );
+  for (const name of referenced) {
+    assert(providerNames.has(name), `RULE-SET references undefined provider: ${name}`);
+  }
 }
 
 {

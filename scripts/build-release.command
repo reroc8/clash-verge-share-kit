@@ -85,6 +85,7 @@ else
 fi
 
 bash -n "$ROOT_DIR/install/install-macos.command"
+bash -n "$ROOT_DIR/macOS点我安装.command"
 bash -n "$ROOT_DIR/scripts/check-sensitive.sh"
 bash -n "$ROOT_DIR/tests/test-installers.sh"
 bash "$ROOT_DIR/tests/test-installers.sh"

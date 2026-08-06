@@ -191,7 +191,8 @@ try {
     Say-B64 '5a6J6KOF5YmN5bey5aSH5Lu95YiwOg=='
     Say-Path $script:BackupDir
     $script:CreatedFilesList = Join-Path $script:BackupDir 'created-files.txt'
-    Set-Content -LiteralPath $script:CreatedFilesList -Value '' -Encoding UTF8
+    # Use BOM-less UTF-8 consistently with the AppendAllText calls below
+    [System.IO.File]::WriteAllText($script:CreatedFilesList, '', (New-Object System.Text.UTF8Encoding($false)))
 
     Backup-ExistingFile (Join-Path $script:ProfilesDir 'Merge.yaml') 'profiles\Merge.yaml'
     Backup-ExistingFile (Join-Path $script:ProfilesDir 'Script.js') 'profiles\Script.js'
