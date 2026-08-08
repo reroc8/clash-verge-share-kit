@@ -10,3 +10,4 @@ reasonix.toml
 profiles.yaml
 *.pem
 *.key
+.mcp.json
