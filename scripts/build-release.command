@@ -160,7 +160,7 @@ if [ -f "$ROOT_DIR/CHANGELOG.md" ]; then
     cp "$ROOT_DIR/CHANGELOG.md" "$TMP_DIR/CHANGELOG.txt"
 fi
 
-if ! grep -q "安装方式" "$TMP_DIR/README.txt"; then
+if ! grep -q "^## 安装" "$TMP_DIR/README.txt"; then
     echo "错误: README.md 缺少 Release 使用说明区段"
     exit 1
 fi
