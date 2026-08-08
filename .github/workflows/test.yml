@@ -1,0 +1,77 @@
+name: test
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      # Pin a fixed mihomo release so upstream changes cannot break the gate.
+      - name: Download mihomo (linux)
+        if: runner.os == 'Linux'
+        run: |
+          curl -fsSL -o mihomo.gz https://github.com/MetaCubeX/mihomo/releases/download/v1.19.29/mihomo-linux-amd64-v1.19.29.gz
+          gunzip -f mihomo.gz
+          chmod +x mihomo
+
+      - name: Download mihomo (windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          curl.exe -fsSL -o mihomo.zip https://github.com/MetaCubeX/mihomo/releases/download/v1.19.29/mihomo-windows-amd64-v1.19.29.zip
+          Expand-Archive -Path mihomo.zip -DestinationPath mihomo-x -Force
+          Get-ChildItem mihomo-x -Recurse -Filter 'mihomo*.exe' | Select-Object -First 1 | Move-Item -Destination mihomo.exe
+
+      - name: Download mihomo (macos)
+        if: runner.os == 'macOS'
+        shell: bash
+        run: |
+          if [ "$(uname -m)" = "arm64" ]; then ASSET=mihomo-darwin-arm64-v1.19.29.gz; else ASSET=mihomo-darwin-amd64-v1.19.29.gz; fi
+          curl -fsSL -o mihomo.gz "https://github.com/MetaCubeX/mihomo/releases/download/v1.19.29/$ASSET"
+          gunzip -f mihomo.gz
+          chmod +x mihomo
+
+      - name: Script.js regression tests with real mihomo
+        env:
+          MIHOMO_BIN: ${{ runner.os == 'Windows' && 'mihomo.exe' || 'mihomo' }}
+        run: node tests/test-script.js
+
+      - name: Installer regression tests (macOS)
+        if: runner.os == 'macOS'
+        run: bash tests/test-installers.sh
+
+      - name: Windows PowerShell sync tests
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          pwsh -NoProfile -File tests/test-windows-sync.ps1
+          foreach ($file in @('install/install-windows.ps1', 'install/sync-profile-bound-files.ps1')) {
+            $content = [System.IO.File]::ReadAllText((Join-Path $env:GITHUB_WORKSPACE $file))
+            if ($content -match '[^\x00-\x7F]') { throw "$file must stay pure ASCII (PowerShell 5.1)"; }
+          }
+
+      - name: Sensitive info scan
+        if: runner.os == 'Linux'
+        run: bash scripts/check-sensitive.sh
+
+      - name: Bash syntax checks
+        if: runner.os != 'Windows'
+        run: |
+          bash -n install/install-macos.command
+          bash -n "macOS点我安装.command"
+          bash -n scripts/check-sensitive.sh
+          bash -n scripts/build-release.command
+          bash -n tests/test-installers.sh
