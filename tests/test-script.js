@@ -471,7 +471,9 @@ if (process.env.MIHOMO_BIN) {
     assert.strictEqual(
       result.status,
       0,
-      `${testCase.name} must pass Mihomo validation:\n${result.stdout || ""}${result.stderr || ""}`
+      `${testCase.name} must pass Mihomo validation:\n` +
+        `status=${result.status} signal=${result.signal} error=${result.error}\n` +
+        `${result.stdout || ""}${result.stderr || ""}`
     );
   }
   console.log(`Mihomo configuration tests passed: ${mihomoCases.length}`);

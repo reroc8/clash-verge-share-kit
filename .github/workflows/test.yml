@@ -44,6 +44,13 @@ jobs:
           gunzip -f mihomo.gz
           chmod +x mihomo
 
+      - name: Probe mihomo binary
+        if: runner.os != 'Windows'
+        run: |
+          pwd
+          ls -la mihomo
+          ./mihomo -v
+
       - name: Script.js regression tests with real mihomo
         env:
           MIHOMO_BIN: ${{ runner.os == 'Windows' && 'mihomo.exe' || 'mihomo' }}
