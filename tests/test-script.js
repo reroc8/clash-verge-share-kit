@@ -465,7 +465,8 @@ if (process.env.MIHOMO_BIN) {
   for (const testCase of mihomoCases) {
     const output = run(testCase.config);
     const encoded = Buffer.from(JSON.stringify(output), "utf8").toString("base64");
-    const result = childProcess.spawnSync(process.env.MIHOMO_BIN, ["-t", "-config", encoded], {
+    const mihomoBin = path.resolve(process.env.MIHOMO_BIN);
+    const result = childProcess.spawnSync(mihomoBin, ["-t", "-config", encoded], {
       encoding: "utf8"
     });
     assert.strictEqual(
