@@ -59,18 +59,7 @@ Release zip 只含安装所需文件。
 
 <!-- release-readme:resume -->
 
-## 发布
-
-```bash
-./scripts/build-release.command              # 开发版
-./scripts/build-release.command v0.3.XX      # 正式版
-```
-
-产物在 `dist/`。push 后仓库 CI 会在 Ubuntu / Windows / macOS 自动重跑全部门禁。
-
-## 安全
-
-不要提交到 GitHub：订阅链接 · 节点配置 · `server` / `password` / `uuid` / `token` · `profiles.yaml` · 日志缓存。
+> 🔒 这个仓库不包含任何订阅、节点或 token。所有配置模板和安装脚本均不含分享者账号信息。
 
 <!-- release-readme:end -->
 
