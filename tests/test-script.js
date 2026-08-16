@@ -316,6 +316,28 @@ function groupByName(config, name) {
 }
 
 {
+  // 节点名恰好叫 Proxies 时，受管组改用备用名，sub-rule 目标必须同步改写为同一备用名
+  const output = run({
+    proxies: [{ name: "Proxies" }, { name: "US-A" }, { name: "TW-A" }],
+    "proxy-groups": [],
+    "sub-rules": {
+      custom: ["DOMAIN-SUFFIX,gpt.example,Proxies"]
+    },
+    rules: ["SUB-RULE,(NETWORK,TCP),custom", "MATCH,DIRECT"]
+  });
+
+  const fallbackGroup = output["proxy-groups"].find(
+    (group) => /^Proxies /.test(group.name)
+  );
+  assert(fallbackGroup, "node named Proxies must force the managed group to a fallback name");
+  assert.deepStrictEqual(
+    output["sub-rules"].custom,
+    [`DOMAIN-SUFFIX,gpt.example,${fallbackGroup.name}`],
+    "sub-rule targets must follow the fallback managed group name when a node steals the canonical name"
+  );
+}
+
+{
   const output = run({
     proxies: [{ name: "AI" }, { name: "US-A" }, { name: "TW-A" }],
     "proxy-groups": [],
