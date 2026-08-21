@@ -271,6 +271,8 @@ rules:
   - DOMAIN,setup.icloud.com,Proxies
   - RULE-SET,apple,DIRECT
   - RULE-SET,icloud,DIRECT
+  # 用户自定义：mail.com 强制走美国
+  - DOMAIN-SUFFIX,mail.com,US
   # YouTube
   - DOMAIN-SUFFIX,youtube.com,YouTube
   - DOMAIN-SUFFIX,youtu.be,YouTube
