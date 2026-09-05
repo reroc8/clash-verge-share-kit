@@ -9,7 +9,7 @@
 - `Google`：Google 账号、登录、OAuth、支付入口和 Google 生态。
 - `YouTube`：`youtube.com`、`youtu.be`、`youtube-nocookie.com`、`youtubeeducation.com`、`youtubegaming.com`、`youtubekids.com`、`googlevideo.com`、`ytimg.com`、`youtubei.googleapis.com`、`yt3.ggpht.com` 等视频、图片、嵌入播放器和儿童/教育子产品域名。
 - `Exchange`：OKX、Bybit、Binance、Bitget、Gate、KuCoin、MEXC、Crypto.com、Coinbase、Kraken、HTX、BingX、BitMart、Bitfinex、Bitstamp、Upbit 等交易所主域名、静态资源域名和 HTTPDNS 辅助域名。
-- `DIRECT`：局域网、国内 IP、钉钉、常规 Apple/iCloud、DeepSeek、Kimi、豆包、通义、文心、腾讯元宝、智谱、MiniMax 等中国大陆 AI。
+- `DIRECT`：局域网、国内 IP、钉钉（含进程级兜底，见下）、常规 Apple/iCloud、DeepSeek、Kimi、豆包、通义、文心、腾讯元宝、智谱、MiniMax 等中国大陆 AI。
 - `Proxies`：明确海外规则命中的普通代理；如果订阅里已有 `proxies` / `PROXIES` 等大小写变体，会复用原组名并自动改写规则目标。节点名与固定组名冲突时，自动组使用 `US Group` 等备用名，避免代理组循环。
 
 代理页显示顺序固定为：
@@ -40,6 +40,18 @@ Claude / AI / Google / YouTube / Telegram / Exchange / US / TW / SG / HK / JP / 
 交易所注意：
 
 `Claude`、`AI` 和 `Exchange` 都只是分流隔离，不代表可绕过平台地区限制。`Claude` 只保留 `US`，国际 `AI` 只保留 `US / TW`，`Exchange` 只保留 `TW / SG`，都不混入其它地区、DIRECT 或 Proxies；没有对应地区节点时使用 `REJECT`，避免直连泄露或误用其它地区。DeepSeek、Kimi、豆包、通义、文心、腾讯元宝、智谱、MiniMax 等中国大陆 AI 明确走 `DIRECT`。未知站点最终兜底为 `DIRECT`，避免国内小站误走代理。
+
+钉钉防偷跑：
+
+钉钉主程序内嵌 Google Firebase / Crashlytics 等海外分析 SDK，其海外对端（Google IP 段）会被 `RULE-SET,google` 命中并送入代理组，实测存在后台持续上传（仅上不下、量级上百 MB）的情况。钉钉自身的钉盘同步、会议中继、大文件 P2P 加速也可能产生大流量，若对端在海外同样会消耗订阅流量。因此在域名直连规则之外增加进程级兜底：
+
+```yaml
+- PROCESS-NAME-REGEX,(?i)dingtalk,DIRECT
+```
+
+该规则按进程名匹配（大小写不敏感），钉钉所有连接一律直连，不依赖域名覆盖是否完整；国内应用直连无功能损失。`MATCH,DIRECT` 兜底保证其余国内应用（网盘、远程桌面等）只有命中代理规则集时才走代理，无需逐个加进程规则。修改 Merge.yaml 后需重新激活订阅（或重启内核）才生效。
+
+验证工具：`scripts/clash-monitor.sh` 通过内核 Unix socket（`/tmp/verge/verge-mihomo.sock`，无需开启外部控制器 TCP 端口）按进程聚合实时上传/下载流量，日志输出到 `monitor/clash-traffic.log`，可用于复查某应用是否仍在消耗代理流量。
 
 兼容策略：
 

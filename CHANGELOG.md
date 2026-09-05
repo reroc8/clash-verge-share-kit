@@ -1,5 +1,20 @@
 # Changelog
 
+## v0.3.24
+
+- 新增 `scripts/clash-monitor.sh`：通过内核 Unix socket（`/tmp/verge/verge-mihomo.sock`）按进程聚合实时上传/下载流量，无需开启外部控制器 TCP 端口；日志写入 `monitor/clash-traffic.log`（CSV）。
+- `Merge.yaml` 新增钉钉进程级兜底直连规则 `PROCESS-NAME-REGEX,(?i)dingtalk,DIRECT`：钉钉内嵌的 Google 分析/推送 SDK 等海外对端流量原先会命中 `RULE-SET,google` 走代理，现按进程强制绕开（置于钉钉域名直连规则之后）。
+
+## v0.3.23
+
+- 修复交易所域名去重范围：仅去重目标是 `Exchange` 组的订阅规则；用户显式指定其它目标（如 `DOMAIN-SUFFIX,binance.com,DIRECT`）的规则不再被删除改道，并保持原有优先级。
+- 修复发版脚本 PowerShell 门禁：`pwsh -Command` 的位置参数拼接导致 `ParseFile` 永远收到空路径；现改为仓库根目录下用相对 ASCII 路径 + 脚本块绑定传参，中文目录下也能正确执行语法检查与同步测试。
+- 修复敏感扫描脚本两处脆弱点：`${SCAN_TOOL}`（后接中文注释）在 C locale 下变量名解析出错；EXIT trap 未保留退出码，致命错误时以 0 退出。扫描失败路径（`exit 1`）行为已验证不受影响。
+- README 新增「安装后 60 秒检查清单」，随 Release 包提取进 README.txt，与 macOS / Windows 安装完成提示一一对应。
+- 打包脚本新增一致性校验：安装器提示引用的章节（如「安装后 60 秒检查清单」）必须真实存在于 README.txt，缺失即终止打包，防止提示与文档脱节。
+- 回归测试同步：非 Exchange 目标的用户规则必须幸存且优先，Exchange 目标规则去重后仅保留注入的一条。
+
+
 ## v0.3.22
 
 - 修复无兜底规则（无 `MATCH/FINAL`）的订阅中，交易所规则被插到所有用户规则之前、行为与带兜底订阅不一致的问题；现在统一为"用户具体规则优先，交易所规则位于其之后、兜底层之前"。
