@@ -685,7 +685,11 @@ function main(config, profileName) {
     var parts = splitRuleParts(rule);
     var type = String(parts[0] || "").trim().toUpperCase();
     var domain = String(parts[1] || "").trim().toLowerCase();
-    return type === "DOMAIN-SUFFIX" && exchangeDomainSet[domain] === true;
+    // 仅去重目标是受管 Exchange 组的规则；指向 DIRECT 等其它目标的是用户意图，必须保留
+    return type === "DOMAIN-SUFFIX" &&
+      exchangeDomainSet[domain] === true &&
+      parts.length > 2 &&
+      String(parts[2] || "").trim() === managedGroups.Exchange;
   }
 
   var exchangeRules = [];

@@ -176,18 +176,22 @@ function groupByName(config, name) {
     rules: [
       "DOMAIN,api.okx.com,DIRECT",
       "DOMAIN-SUFFIX,OKX.COM,DIRECT",
+      "DOMAIN-SUFFIX,bybit.com,Exchange",
       "AND,((DOMAIN-SUFFIX,bybit.com),(NETWORK,TCP)),DIRECT",
       "MATCH,DIRECT"
     ]
   });
 
   const exactRuleIndex = output.rules.indexOf("DOMAIN,api.okx.com,DIRECT");
+  const userDirectIndex = output.rules.indexOf("DOMAIN-SUFFIX,OKX.COM,DIRECT");
   const logicalRuleIndex = output.rules.indexOf("AND,((DOMAIN-SUFFIX,bybit.com),(NETWORK,TCP)),DIRECT");
   const exchangeRuleIndex = output.rules.findIndex((rule) => rule.startsWith("DOMAIN-SUFFIX,okx.com,"));
   assert.strictEqual(exactRuleIndex, 0, "specific subscription rules must keep their original priority");
+  assert(userDirectIndex !== -1 && userDirectIndex < exchangeRuleIndex, "user rules with non-Exchange targets must survive dedup and keep priority");
   assert(logicalRuleIndex < exchangeRuleIndex, "specific logical rules must be allowed to override automatic Exchange routing");
   assert(exactRuleIndex < exchangeRuleIndex, "exact subscription rules must be allowed to override automatic Exchange routing");
-  assert(!output.rules.includes("DOMAIN-SUFFIX,OKX.COM,DIRECT"), "case variants of managed exchange rules must be deduplicated");
+  const bybitExchangeCount = output.rules.filter((rule) => rule === "DOMAIN-SUFFIX,bybit.com,Exchange").length;
+  assert.strictEqual(bybitExchangeCount, 1, "rules already targeting the managed Exchange group must be deduplicated");
 }
 
 {

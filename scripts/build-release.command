@@ -97,12 +97,17 @@ elif command -v powershell >/dev/null 2>&1; then
     POWERSHELL_BIN="$(command -v powershell)"
 fi
 if [ -n "$POWERSHELL_BIN" ]; then
-    for ps_file in "$ROOT_DIR/install/install-windows.ps1" "$ROOT_DIR/install/sync-profile-bound-files.ps1"; do
-        "$POWERSHELL_BIN" -NoProfile -Command \
-            '$tokens = $null; $errors = $null; [void][System.Management.Automation.Language.Parser]::ParseFile($args[0], [ref]$tokens, [ref]$errors); if ($errors.Count -gt 0) { $errors | ForEach-Object { Write-Error $_ }; exit 1 }' \
-            "$ps_file"
-    done
-    "$POWERSHELL_BIN" -NoProfile -File "$ROOT_DIR/tests/test-windows-sync.ps1"
+    # 必须用相对 ASCII 路径 + & {} 绑定参数：仓库路径含中文时 argv 编码不可靠，
+    # 且 pwsh -Command 会把位置参数拼接进命令文本（$args 恒为空），直接传参必然解析失败
+    (
+        cd "$ROOT_DIR" || exit 1
+        for ps_file in install/install-windows.ps1 install/sync-profile-bound-files.ps1; do
+            "$POWERSHELL_BIN" -NoProfile -Command \
+                '& { param([string] $path) $tokens = $null; $errors = $null; [void][System.Management.Automation.Language.Parser]::ParseFile((Resolve-Path $path), [ref]$tokens, [ref]$errors); if ($errors.Count -gt 0) { $errors | ForEach-Object { Write-Error $_ }; exit 1 } }' \
+                "$ps_file" || exit 1
+        done
+        "$POWERSHELL_BIN" -NoProfile -File tests/test-windows-sync.ps1 || exit 1
+    ) || exit 1
 else
     echo "警告: 未找到 pwsh，已跳过 Windows PowerShell 语法与同步测试"
 fi
@@ -164,6 +169,15 @@ if ! grep -q "^## 安装" "$TMP_DIR/README.txt"; then
     echo "错误: README.md 缺少 Release 使用说明区段"
     exit 1
 fi
+
+# 安装器完成提示里提到的章节，必须真实存在于 README.txt，缺失即停止打包。
+# 防止再次出现“提示指向不存在的章节”；以后提示里引用了新章节，就在这个列表里加一行。
+for needed_section in "安装后 60 秒检查清单"; do
+    if ! grep -q "^## ${needed_section}" "$TMP_DIR/README.txt"; then
+        echo "错误: README.txt 缺少安装器提示引用的章节「${needed_section}」"
+        exit 1
+    fi
+done
 
 perl -0pi -e 's/\r?\n/\r\n/g' "$TMP_DIR/Windows点我安装.bat"
 

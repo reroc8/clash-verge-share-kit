@@ -3,7 +3,7 @@ set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 TMP_FILE="$(mktemp "${TMPDIR:-/tmp}/clash-verge-share-kit-sensitive.XXXXXX")"
-trap 'rm -f "$TMP_FILE"' EXIT
+trap 'rc=$?; rm -f "$TMP_FILE"; exit $rc' EXIT
 
 SENSITIVE_PATTERN='((^|[^[:alnum:]_-])["'"'"']?(server|password|uuid|cipher|alterId|client-fingerprint|private-key|servername|sni|skip-cert-verify|secret)["'"'"']?[[:space:]]*:|(^|[[:space:]{,])["'"'"']?(proxies|proxy-providers)["'"'"']?[[:space:]]*:[[:space:]]*([\[{]|$)|(ss|vmess|vless|trojan|hysteria2|tuic|wireguard)://[^[:space:]"'"'"'`、]+|https?://[^[:space:]"'"'"']*(token=|subscribe|subscription|api/v1/client/subscribe|api/v1/passport/auth/subscribe))'
 if [ "$#" -gt 0 ]; then
@@ -51,7 +51,7 @@ if [ "$STATUS" -eq 0 ]; then
         printf '%s\n' "$FILTERED"
         exit 1
     fi
-    echo "敏感信息扫描通过: 使用 $SCAN_TOOL（已豁免 tests/ 夹具与扫描器自指内容）"
+    echo "敏感信息扫描通过: 使用 ${SCAN_TOOL}（已豁免 tests/ 夹具与扫描器自指内容）"
     exit 0
 fi
 
@@ -60,4 +60,4 @@ if [ "$STATUS" -ne 1 ]; then
     exit "$STATUS"
 fi
 
-echo "敏感信息扫描通过: 使用 $SCAN_TOOL"
+echo "敏感信息扫描通过: 使用 ${SCAN_TOOL}"

@@ -33,6 +33,16 @@
 
 退出 Clash Verge Rev → 打开安装时提示的 `backup_*` 目录 → 把 `profiles/` 和 `root/` 的文件复制回原位置 → 若 `created-files.txt` 非空，删掉其中列出的文件 → 重新打开。
 
+## 安装后 60 秒检查清单
+
+重新打开 Clash Verge Rev 后，按顺序核对：
+
+1. 代理页能看到 `Claude / AI / Google / YouTube / Telegram / Exchange` 与 `US / TW / SG / HK / JP / Proxies` 这些策略组。
+2. 打开 `claude.ai` 和 `chatgpt.com`，页面能正常打开。
+3. 打开 `youtube.com`，视频能播放。
+4. 打开 `baidu.com`，确认国内网站直连正常。
+5. 某个网站异常：先到对应策略组里换一个节点；仍异常再查看 Clash Verge Rev 日志。
+
 <!-- release-readme:pause -->
 
 ## 原理
