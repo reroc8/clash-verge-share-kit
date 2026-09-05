@@ -21,6 +21,8 @@ LOGFILE="${2:-$LOGDIR/clash-traffic.log}"
 mkdir -p "$LOGDIR"
 
 # 进程级累计状态持久化在 /tmp/clash-mon-state.txt（由 Python 维护）
+# 每次启动重置状态：首轮只记基线不记增量，避免把连接累计总量当成增量
+rm -f /tmp/clash-mon-state.txt /tmp/clash-mon-delta.txt
 
 fetch() { curl -s -m 5 --unix-socket "$SOCK" http://localhost/connections; }
 
@@ -43,7 +45,10 @@ for k, (u, dn, n) in agg.items():
 PYEOF
 }
 
-echo "timestamp,process,upload_delta_mb,download_delta_mb,connections" >> "$LOGFILE"
+# CSV 表头只写一次（日志文件为空时）
+if [ ! -s "$LOGFILE" ]; then
+  echo "timestamp,process,upload_delta_mb,download_delta_mb,connections" > "$LOGFILE"
+fi
 echo "[监控启动] socket=$SOCK  日志=$LOGFILE  (Ctrl+C 停止)"
 
 ITER=0
@@ -55,6 +60,7 @@ while true; do
     python3 - "$TS" "$LOGFILE" <<'PYEOF'
 import sys, os, collections
 ts, logfile = sys.argv[1], sys.argv[2]
+first_sample = not os.path.exists('/tmp/clash-mon-state.txt')
 before = collections.defaultdict(lambda: [0, 0, 0])
 try:
     with open('/tmp/clash-mon-state.txt') as f:
@@ -68,6 +74,16 @@ with open('/tmp/clash-mon-delta.txt') as f:
     for line in f:
         k, u, dn, n = line.rstrip('\n').split('\t')
         now[k] = [int(u), int(dn), int(n)]
+if first_sample:
+    # 基线轮：写入状态但不记增量（连接累计总量不是本轮产生）
+    with open('/tmp/clash-mon-state.txt', 'w') as f:
+        for k, (u, dn, n) in now.items():
+            f.write(f"{k}\t{u}\t{dn}\t{n}\n")
+    top = sorted(now.items(), key=lambda x: -(x[1][0] + x[1][1]))[:8]
+    print(f"── {ts} 基线（连接累计总量） ──")
+    for k, (u, dn, n) in top:
+        print(f"  {k:<28} ↑{u/1048576:9.2f}MB ↓{dn/1048576:9.2f}MB  ({n}连接)")
+    sys.exit(0)
 with open('/tmp/clash-mon-state.txt', 'w') as f:
     for k, (u, dn, n) in now.items():
         f.write(f"{k}\t{u}\t{dn}\t{n}\n")

@@ -1,5 +1,10 @@
 # Changelog
 
+## v0.3.25
+
+- 钉钉进程直连规则从 `(?i)dingtalk` 收紧为 `(?i)ding(talk|meeting)`：覆盖会议子进程 `DingMeeting`（实测存在于 macOS 钉钉全家桶，原先不被匹配），堵住与主进程相同的 Google SDK 走代理通道。
+- `scripts/clash-monitor.sh` 修复三处自身缺陷：启动时重置状态文件（重启后不再沿用旧状态导致首轮增量错乱）；首轮只记基线不写 CSV（连接累计总量不再被当成当轮增量）；CSV 表头仅在日志为空时写入（不再重复追加）。
+
 ## v0.3.24
 
 - 新增 `scripts/clash-monitor.sh`：通过内核 Unix socket（`/tmp/verge/verge-mihomo.sock`）按进程聚合实时上传/下载流量，无需开启外部控制器 TCP 端口；日志写入 `monitor/clash-traffic.log`（CSV）。

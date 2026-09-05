@@ -260,9 +260,10 @@ rules:
   - DOMAIN-SUFFIX,dingtalk.com,DIRECT
   - DOMAIN-SUFFIX,dingtalkcdn.com,DIRECT
   - DOMAIN-SUFFIX,lwurl.to,DIRECT
-  # 钉钉进程级兜底直连：其内嵌的 Google 分析/推送 SDK 等海外对端流量
-  # （会命中 RULE-SET,google 等代理规则）全部按进程强制绕开代理
-  - PROCESS-NAME-REGEX,(?i)dingtalk,DIRECT
+  # 钉钉进程级兜底直连：主进程 DingTalk 与会议子进程 DingMeeting 等全家桶
+  # 内嵌的 Google 分析/推送 SDK 等海外对端流量（会命中 RULE-SET,google 等代理
+  # 规则）全部按进程强制绕开代理
+  - PROCESS-NAME-REGEX,(?i)ding(talk|meeting),DIRECT
   # 自定义直连：放在宽泛代理规则前，避免被后续规则集抢先命中
   - DOMAIN,codebuddy.cn,DIRECT
   - DOMAIN,copilot.tencent.com,DIRECT
