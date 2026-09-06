@@ -1,68 +1,76 @@
 # 🛡️ Clash Verge Rev Share Kit
 
-> 下载、解压、双击安装。让所有常用网站自动走最合适的线路。
+> 下载 → 解压 → 双击安装。常用网站自动走最合适的线路。
 
 [![release](https://img.shields.io/github/v/release/reroc8/clash-verge-share-kit?color=2084ff&label=最新版本)](https://github.com/reroc8/clash-verge-share-kit/releases/latest)
-[![test](https://github.com/reroc8/clash-verge-share-kit/actions/workflows/test.yml/badge.svg)](https://github.com/reroc8/clash-verge-share-kit/actions)
+[![test](https://img.shields.io/github/actions/workflow/status/reroc8/clash-verge-share-kit/test.yml?label=测试)](https://github.com/reroc8/clash-verge-share-kit/actions)
 
-> ⚠️ 这个项目只提供配置模板和安装脚本，**不含任何订阅、节点、账号**。需先导入自己的订阅。
+> ⚠️ 只提供配置模板和安装脚本，**不含任何订阅、节点、账号**。请先在 Clash Verge Rev 里导入自己的订阅。
 
 <!-- release-readme:start -->
 
 ## 装完后是什么效果
 
-| 打开的网站 | 走的线路 |
+| 你打开的网站 | 走的线路 |
 |---|---|
-| `Claude` / `ChatGPT` / `Gemini` / `Copilot` 等国际 AI | `Claude` · `AI` |
+| Claude / ChatGPT / Gemini / Copilot 等国际 AI | 🤖 `Claude` · `AI`，锁定美区出口 |
 | DeepSeek / Kimi / 豆包 / 通义 等大陆 AI | 🏠 直连 |
-| `Google` / `YouTube` / `Telegram` | 各自对应组 |
-| `OKX` / `Bybit` / `Binance` 等交易所 | `Exchange`（TW · SG） |
+| Google / YouTube / Telegram | 🌐 各自独立分组 |
+| OKX / Bybit / Binance 等交易所 | 💱 `Exchange`，锁定 TW · SG |
 | 国内网站 · 局域网 | 🏠 直连 |
-| 其他海外网站 | `Proxies` |
+| 其他海外网站 | 🚀 `Proxies` |
+
+分组互相隔离：AI 不和娱乐流量混出口，交易所永远固定地区，减少风控变量。
 
 ## 安装
 
 1. **准备** — 安装 Clash Verge Rev，导入自己的订阅，确认能代理后**完全退出**。
 2. **下载** — 从 [Release](https://github.com/reroc8/clash-verge-share-kit/releases/latest) 下载最新 zip 并解压。
 3. **安装** — 双击 `macOS点我安装.command`（Mac）或 `Windows点我安装.bat`（Win 10/11）。
-4. **完成** — 重新打开 Clash Verge Rev，在代理页按用途选节点。
+4. **完成** — 重新打开 Clash Verge Rev，按下方「安装后 60 秒检查清单」核对。
 
-安装脚本会先备份再覆盖配置，不修改订阅和节点。自动备份只保留最近 **5 个**，手工备份不会被删。
+安装前自动备份，不修改订阅和节点。自动备份只保留最近 **5 个**，手工备份不会被删。
 
 ## 备份还原
 
-退出 Clash Verge Rev → 打开安装时提示的 `backup_*` 目录 → 把 `profiles/` 和 `root/` 的文件复制回原位置 → 若 `created-files.txt` 非空，删掉其中列出的文件 → 重新打开。
+1. 完全退出 Clash Verge Rev。
+2. 打开安装完成时提示的 `backup_*` 目录。
+3. 把 `profiles/` 和 `root/` 里的文件复制回原位置。
+4. 若 `created-files.txt` 非空，删除其中列出的文件。
+5. 重新打开 Clash Verge Rev。
 
 ## 安装后 60 秒检查清单
 
-重新打开 Clash Verge Rev 后，按顺序核对：
+重新打开后，按顺序核对：
 
 1. 代理页能看到 `Claude / AI / Google / YouTube / Telegram / Exchange` 与 `US / TW / SG / HK / JP / Proxies` 这些策略组。
-2. 打开 `claude.ai` 和 `chatgpt.com`，页面能正常打开。
+2. 打开 `claude.ai` 和 `chatgpt.com`，页面正常。
 3. 打开 `youtube.com`，视频能播放。
-4. 打开 `baidu.com`，确认国内网站直连正常。
-5. 某个网站异常：先到对应策略组里换一个节点；仍异常再查看 Clash Verge Rev 日志。
+4. 打开 `baidu.com`，国内网站直连正常。
+5. 某个网站异常：先到对应策略组换一个节点；仍异常再看 Clash Verge Rev 日志。
+
+更新内容见包内 `CHANGELOG.txt`。
 
 <!-- release-readme:pause -->
 
 ## 原理
 
-`Script.js` 自动补齐策略组、改写规则、隐藏订阅自带杂乱组：
+`Script.js` 在订阅之上做增强，不动节点：
 
-- `Claude` = US ｜ `AI` = US / TW ｜ `Exchange` = TW / SG
-- 大陆 AI 强制直连
-- 规则、监听器、隧道等引用自定义组时自动保留，不动节点
-- 订阅自带 `REJECT` 规则保留
+- 补齐策略组并固定地区：`Claude` = US ｜ `AI` = US / TW ｜ `Exchange` = TW / SG。
+- 大陆 AI 强制直连；钉钉全家桶（含会议子进程）进程级直连，防止内嵌海外 SDK 偷跑代理流量。
+- 订阅自带 `REJECT` 规则保留；引用自定义组的规则、监听器、隧道自动识别，不误删。
 
-详细说明见 [`docs/routing.md`](docs/routing.md)。
+详见 [`docs/routing.md`](docs/routing.md)。
 
 ## 项目结构
 
-```
+```text
 config/    Merge.yaml · Script.js · verge.yaml · dns_config.yaml
 install/   macOS · Windows 安装脚本
-scripts/   构建 + 敏感扫描
+scripts/   构建 · 敏感扫描 · 流量监控（clash-monitor.sh）
 tests/     回归测试
+docs/      路由设计文档
 ```
 
 Release zip 只含安装所需文件。
