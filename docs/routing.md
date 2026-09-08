@@ -49,7 +49,7 @@ Claude / AI / Google / YouTube / Telegram / Exchange / US / TW / SG / HK / JP / 
 - PROCESS-NAME-REGEX,(?i)ding(talk|meeting),DIRECT
 ```
 
-该规则按进程名匹配（大小写不敏感），覆盖主进程 `DingTalk` 与会议子进程 `DingMeeting` 等全家桶，钉钉所有连接一律直连，不依赖域名覆盖是否完整；国内应用直连无功能损失。`MATCH,DIRECT` 兜底保证其余国内应用（网盘、远程桌面等）只有命中代理规则集时才走代理，无需逐个加进程规则。修改 Merge.yaml 后需重新激活订阅（或重启内核）才生效。
+该规则按进程名匹配（大小写不敏感），覆盖主进程 `DingTalk` 与会议子进程 `DingMeeting` 等全家桶。规则置于私网直连之后、所有业务精确域名规则之前，因此**无条件生效**：钉钉进程的任何连接都会被强制直连，不受后面 Claude/AI/Google 精确域名规则或规则集影响。已知的边缘取舍是钉钉内置浏览器打开 Claude/AI 等需代理站点时同样走直连（无法加载），对 IM 场景可接受。钉钉自己的域名直连规则保留在原位置，服务于浏览器等非钉钉进程访问钉钉站点。`MATCH,DIRECT` 兜底保证其余国内应用（网盘、远程桌面等）只有命中代理规则集时才走代理，无需逐个加进程规则。修改 Merge.yaml 后需重新激活订阅（或重启内核）才生效。
 
 验证工具：`scripts/clash-monitor.sh` 通过内核 Unix socket（`/tmp/verge/verge-mihomo.sock`，无需开启外部控制器 TCP 端口）按进程聚合实时上传/下载流量，日志输出到 `monitor/clash-traffic.log`，可用于复查某应用是否仍在消耗代理流量。
 
