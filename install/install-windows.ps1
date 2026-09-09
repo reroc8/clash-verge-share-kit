@@ -165,7 +165,9 @@ try {
         New-Item -ItemType Directory -Path $script:ProfilesDir -Force | Out-Null
     }
 
-    $runningNames = @('clash-verge', 'Clash Verge Rev', 'verge-mihomo', 'verge-mihomo-alpha', 'mihomo')
+    # Get-Process -Name 支持通配符：clash-verge* 覆盖 clash-verge / clash-verge-service，
+    # Clash Verge* 覆盖带空格的变体名，verge-mihomo* 覆盖 alpha 内核。
+    $runningNames = @('clash-verge*', 'Clash Verge*', 'verge-mihomo*', 'mihomo')
     foreach ($name in $runningNames) {
         if (Get-Process -Name $name -ErrorAction SilentlyContinue) {
             Say-B64 '6ZSZ6K+vOiDmo4DmtYvliLAgQ2xhc2ggVmVyZ2UgUmV2IOaIluWGheaguOS7jeWcqOi/kOihjOOAguivt+WFiOWujOWFqOmAgOWHuuOAgg=='

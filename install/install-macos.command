@@ -233,10 +233,12 @@ if [ ! -d "$CLASH_DIR" ]; then
 fi
 
 is_clash_running() {
-    pgrep -x "clash-verge" >/dev/null 2>&1 ||
-    pgrep -x "verge-mihomo" >/dev/null 2>&1 ||
-    pgrep -x "verge-mihomo-alpha" >/dev/null 2>&1 ||
-    pgrep -x "mihomo" >/dev/null 2>&1
+    # -i 大小写不敏感；clash-verge 用子串匹配以覆盖 clash-verge-service 等，
+    # 带空格的变体名（不同安装方式下 GUI 二进制名）用 -x 精确匹配。
+    pgrep -i "clash-verge" >/dev/null 2>&1 ||
+    pgrep -ix "clash verge" >/dev/null 2>&1 ||
+    pgrep -ix "Clash Verge Rev" >/dev/null 2>&1 ||
+    pgrep -i "mihomo" >/dev/null 2>&1
 }
 
 if is_clash_running; then
