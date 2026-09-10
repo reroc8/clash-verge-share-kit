@@ -340,7 +340,8 @@ function main(config, profileName) {
         continue;
       }
       var compactProvider = ruleProviders[compactProviderName];
-      if (compactProvider && hasOwn(originalCustomGroupNames, compactProvider.proxy)) {
+      // 与规则目标的引用检测（ruleReferencesCustomGroup）同一套大小写不敏感语义
+      if (compactProvider && lookupName(originalCustomGroupNames, compactProvider.proxy) !== undefined) {
         customGroupIsReferenced = true;
         break;
       }
@@ -492,8 +493,13 @@ function main(config, profileName) {
         continue;
       }
       var ruleProvider = ruleProviders[ruleProviderName];
-      if (ruleProvider && managedTargetMap[ruleProvider.proxy]) {
-        ruleProvider.proxy = managedTargetMap[ruleProvider.proxy];
+      // 与规则目标改写同一套 lookupName 大小写不敏感语义，
+      // 避免订阅写法如 proxy: PROXIES 在组名沿用订阅原大小写时悬空
+      if (ruleProvider) {
+        var mappedProviderProxy = lookupName(managedTargetMap, ruleProvider.proxy);
+        if (mappedProviderProxy !== undefined) {
+          ruleProvider.proxy = mappedProviderProxy;
+        }
       }
     }
   }

@@ -108,6 +108,43 @@ function groupByName(config, name) {
 }
 
 {
+  // rule-provider.proxy 的大小写变体必须与规则目标同一套 lookupName 语义改写：
+  // 订阅组名为小写 proxies（被沿用），provider 写 PROXIES 不能悬空
+  const output = run({
+    proxies: [{ name: "US-A" }],
+    "proxy-groups": [{ name: "proxies", type: "select", proxies: ["US-A"] }],
+    "rule-providers": {
+      test: { type: "inline", behavior: "domain", proxy: "PROXIES", payload: ["example.test"] }
+    },
+    rules: ["MATCH,DIRECT"]
+  });
+
+  assert(groupByName(output, "proxies"), "subscription lowercase proxies group must be inherited");
+  assert.strictEqual(
+    output["rule-providers"].test.proxy,
+    "proxies",
+    "rule-provider proxy must be rewritten case-insensitively to the inherited group name"
+  );
+}
+
+{
+  // compact 引用检测对 provider.proxy 的大小写变体同样敏感，不误删被引用的自定义组
+  const output = run({
+    proxies: [{ name: "US-A" }, { name: "HK-A" }],
+    "proxy-groups": [{ name: "MyRoute", type: "select", proxies: ["HK-A"] }],
+    "rule-providers": {
+      custom: { type: "inline", behavior: "domain", proxy: "MYROUTE", payload: ["example.test"] }
+    },
+    rules: ["MATCH,DIRECT"]
+  });
+
+  assert(
+    groupByName(output, "MyRoute"),
+    "case-variant rule-provider proxy must keep the referenced custom group alive in compact mode"
+  );
+}
+
+{
   const output = run({
     proxies: [{ name: "US-bootstrap" }],
     "proxy-providers": {
