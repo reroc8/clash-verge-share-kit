@@ -1,5 +1,14 @@
 # Changelog
 
+## v0.3.27
+
+- 补齐此前已提交但未发版的安装器加固：macOS 改用 `pgrep -i` 子串匹配覆盖 `clash-verge-service` 等变体名，带空格的 GUI 进程名用 `-x` 精确匹配；Windows 改用 `Get-Process -Name` 通配（`clash-verge*` / `Clash Verge*` / `verge-mihomo*` / `mihomo`），堵住"内核仍在运行但被漏检"的边缘场景。
+- 补齐此前已提交但未发版的 `Script.js` 修复：`rule-provider.proxy` 改写与 compact 引用检测统一改走 `lookupName`，与规则目标同一套大小写不敏感语义；订阅组名沿用原大小写（如 `proxies`）而 provider 写 `PROXIES` 时不再生成悬空引用。
+- 修复 `tests/test-installers.sh` 在交互式终端下静默挂死：安装器的完成暂停改为仅在 stdin 与 stdout 同时为终端时生效，测试内三处安装器调用补 `< /dev/null`。此前 `scripts/build-release.command`（双击运行）会连带冻结在安装器测试这一步，且因输出重定向而看不到任何提示。
+- 发版脚本新增版本号守卫：目标版本若已有 tag 且指向其它提交，直接拒绝打包并提示升版本号，避免同一版本号产出两份内容不同的包（tag / Release 资产 / 本地 zip 三者分叉）。
+- 备份标记统计改用 `find -exec sh -c` 传路径，不再依赖 find 对参数内嵌 `{}` 的替换；部分 find 实现不替换该占位符会导致统计恒为 0 的假失败。
+- README 修正效果表中 `AI` 组的出口表述（`AI` 为 `US / TW`，并非锁定美区），项目结构块补上 `monitor/`。
+
 ## v0.3.26
 
 - 钉钉进程直连规则前置：从钉钉域名规则区（约 259 行）移至私网直连规则之后、所有业务精确域名规则之前。原位次下钉钉进程若访问 97-258 行的精确代理域名（Claude / AI / Google 精确域 / mail.com）仍会走代理，与文档"钉钉所有连接一律直连"的承诺不符；前置后承诺无条件成立。经核对钉钉 SDK 实际域名（Firebase / Crashlytics / Google Analytics 系）与精确规则无交集，本次属稳健性修复而非漏洞修复。已知边缘取舍：钉钉内置浏览器打开 Claude/AI 等需代理站点将走直连。

@@ -13,7 +13,7 @@
 
 | 你打开的网站 | 走的线路 |
 |---|---|
-| Claude / ChatGPT / Gemini / Copilot 等国际 AI | 🤖 `Claude` · `AI`，锁定美区出口 |
+| Claude / ChatGPT / Gemini / Copilot 等国际 AI | 🤖 `Claude` = US ｜ `AI` = US / TW |
 | DeepSeek / Kimi / 豆包 / 通义 等大陆 AI | 🏠 直连 |
 | Google / YouTube / Telegram | 🌐 各自独立分组 |
 | OKX / Bybit / Binance 等交易所 | 💱 `Exchange`，锁定 TW · SG |
@@ -71,6 +71,7 @@ install/   macOS · Windows 安装脚本
 scripts/   构建 · 敏感扫描 · 流量监控（clash-monitor.sh）
 tests/     回归测试
 docs/      路由设计文档
+monitor/   clash-monitor.sh 输出的流量日志目录（不进 Release 包）
 ```
 
 Release zip 只含安装所需文件。

@@ -45,7 +45,9 @@ cleanup_old_backups() {
 }
 
 pause_before_close() {
-    [ -t 0 ] || return 0
+    # 仅在 stdin 与 stdout 都是终端时才暂停。stdout 被重定向时（自动化脚本、
+    # 回归测试、双击发版脚本）调用方看不到提示，read 会静默阻塞成假死。
+    [ -t 0 ] && [ -t 1 ] || return 0
     echo ""
     read -r -p "按回车键关闭窗口..." _ || true
 }

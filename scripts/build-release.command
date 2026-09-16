@@ -11,6 +11,17 @@ if [ -n "$VERSION" ]; then
         echo "错误: 版本号必须使用 vX.Y.Z 格式，例如 v0.3.8"
         exit 1
     fi
+    # 版本号守卫：该版本号若已有 tag 且指向其它提交，说明这个版本已经从另一个提交发布过。
+    # 继续打包会用同一版本号产出内容不同的包，造成 tag / Release 资产 / 本地 zip 三者分叉。
+    # 注意本地 tag 可能落后于远端（gh release create 只创建远端 tag），必要时先 git fetch --tags。
+    released_commit="$(git -C "$ROOT_DIR" rev-parse -q --verify --short "refs/tags/$VERSION" 2>/dev/null || true)"
+    head_commit="$(git -C "$ROOT_DIR" rev-parse -q --verify --short HEAD 2>/dev/null || true)"
+    if [ -n "$released_commit" ] && [ -n "$head_commit" ] && [ "$released_commit" != "$head_commit" ]; then
+        echo "错误: $VERSION 已经发布过（tag 指向 $released_commit，当前 HEAD 是 $head_commit）"
+        echo "同一版本号不能产出两份内容不同的包。请先升版本号，或确认是否要重发该版本。"
+        echo "若本地 tag 不完整，请先执行 git fetch --tags 再重试。"
+        exit 1
+    fi
     if [ ! -f "$ROOT_VERSION_FILE" ]; then
         echo "错误: 缺少 VERSION.txt。请先在项目根目录写入目标版本号"
         exit 1

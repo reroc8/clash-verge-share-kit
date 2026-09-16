@@ -11,3 +11,5 @@ profiles.yaml
 *.pem
 *.key
 .mcp.json
+.workbuddy-ai/
+.workbuddy/

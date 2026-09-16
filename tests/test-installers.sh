@@ -59,7 +59,9 @@ printf '%s\n' \
     >> "$CLASH_DIR/profiles.yaml"
 
 INSTALL_LOG="$TMP_HOME/install.log"
-PATH="$TMP_HOME/bin:$PATH" HOME="$TMP_HOME" bash "$ROOT_DIR/install/install-macos.command" > "$INSTALL_LOG" 2>&1
+# stdin 必须显式重定向：否则安装器继承调用方的终端，完成提示里的 read 会阻塞等待回车，
+# 而所有输出都在日志文件里，表现为测试静默挂死（发版脚本调用本测试时同样受影响）。
+PATH="$TMP_HOME/bin:$PATH" HOME="$TMP_HOME" bash "$ROOT_DIR/install/install-macos.command" > "$INSTALL_LOG" 2>&1 < /dev/null
 
 cmp -s "$ROOT_DIR/config/Merge.yaml" "$PROFILES_DIR/verge.yaml"
 cmp -s "$ROOT_DIR/config/Merge.yaml" "$PROFILES_DIR/order-first.yaml"
@@ -99,7 +101,7 @@ printf '%s\n' \
     > "$CLASH2_DIR/profiles.yaml"
 
 RESTORE_LOG="$RESTORE_HOME/restore.log"
-PATH="$TMP_HOME/bin:$PATH" HOME="$RESTORE_HOME" bash "$KIT_DIR/install/install-macos.command" > "$RESTORE_LOG" 2>&1 && {
+PATH="$TMP_HOME/bin:$PATH" HOME="$RESTORE_HOME" bash "$KIT_DIR/install/install-macos.command" > "$RESTORE_LOG" 2>&1 < /dev/null && {
     echo "restore test: installer unexpectedly succeeded"
     exit 1
 }
@@ -133,9 +135,11 @@ mkdir -p "$CLASH3_DIR/backup_20260101_000000_AAAAAA"
 touch "$CLASH3_DIR/backup_20260101_000000_AAAAAA/keep.txt"
 
 CLEAN_LOG="$CLEAN_HOME/clean.log"
-PATH="$TMP_HOME/bin:$PATH" HOME="$CLEAN_HOME" bash "$ROOT_DIR/install/install-macos.command" > "$CLEAN_LOG" 2>&1
+PATH="$TMP_HOME/bin:$PATH" HOME="$CLEAN_HOME" bash "$ROOT_DIR/install/install-macos.command" > "$CLEAN_LOG" 2>&1 < /dev/null
 
-MARKED_COUNT="$(find "$CLASH3_DIR" -maxdepth 1 -type d -name 'backup_*' -exec test -f '{}/.installer-backup' \; -print | wc -l | tr -d ' ')"
+# 用 sh -c 传路径，避免依赖 find 对参数内嵌 {} 的替换：
+# BSD find 支持内嵌替换，但 toybox/busybox 等实现不替换，会让这里恒为 0 而假失败。
+MARKED_COUNT="$(find "$CLASH3_DIR" -maxdepth 1 -type d -name 'backup_*' -exec sh -c 'test -f "$1/.installer-backup"' _ {} \; -print | wc -l | tr -d ' ')"
 MANUAL_COUNT="$(find "$CLASH3_DIR" -maxdepth 1 -type d -name 'backup_*_manual_*' | wc -l | tr -d ' ')"
 COLLISION_COUNT="$(find "$CLASH3_DIR" -maxdepth 1 -type d -name 'backup_20260101_000000_AAAAAA' | wc -l | tr -d ' ')"
 TOTAL_COUNT="$(find "$CLASH3_DIR" -maxdepth 1 -type d -name 'backup_*' | wc -l | tr -d ' ')"
