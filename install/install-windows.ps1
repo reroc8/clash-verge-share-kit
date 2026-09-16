@@ -165,8 +165,9 @@ try {
         New-Item -ItemType Directory -Path $script:ProfilesDir -Force | Out-Null
     }
 
-    # Get-Process -Name 支持通配符：clash-verge* 覆盖 clash-verge / clash-verge-service，
-    # Clash Verge* 覆盖带空格的变体名，verge-mihomo* 覆盖 alpha 内核。
+    # Get-Process -Name supports wildcards: clash-verge* covers clash-verge and
+    # clash-verge-service, Clash Verge* covers the space-containing variant name,
+    # and verge-mihomo* covers the alpha kernel.
     $runningNames = @('clash-verge*', 'Clash Verge*', 'verge-mihomo*', 'mihomo')
     foreach ($name in $runningNames) {
         if (Get-Process -Name $name -ErrorAction SilentlyContinue) {

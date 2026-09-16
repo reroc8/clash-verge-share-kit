@@ -22,6 +22,14 @@ if [ -n "$VERSION" ]; then
         echo "若本地 tag 不完整，请先执行 git fetch --tags 再重试。"
         exit 1
     fi
+    # 工作树守卫：正式包的内容必须等于某个提交的内容，否则"版本号 -> 产物"不再可复现。
+    # 只拦正式包（带版本号参数）；不带参数打 dev 包时允许边改边试。
+    if [ -n "$(git -C "$ROOT_DIR" status --porcelain --untracked-files=no 2>/dev/null)" ]; then
+        echo "错误: 工作树有未提交的改动，不能打 $VERSION 正式包"
+        git -C "$ROOT_DIR" status --short --untracked-files=no
+        echo "产物必须对应一个确定的提交。请先提交（或 stash）后再打包。"
+        exit 1
+    fi
     if [ ! -f "$ROOT_VERSION_FILE" ]; then
         echo "错误: 缺少 VERSION.txt。请先在项目根目录写入目标版本号"
         exit 1
@@ -135,22 +143,26 @@ cp "$ROOT_DIR/install/install-windows.bat"   "$TMP_DIR/Windows点我安装.bat"
 cp "$ROOT_DIR/install/install-windows.ps1"   "$TMP_DIR/install-windows.ps1"
 cp "$ROOT_DIR/install/install-macos.command" "$TMP_DIR/macOS点我安装.command"
 cp "$ROOT_DIR/install/sync-profile-bound-files.ps1" "$TMP_DIR/sync-profile-bound-files.ps1"
+# 纯 ASCII 门禁：判定必须用字节区间 [^[:space:] -~]，不能用 [^[:print:][:space:]]。
+# macOS 自带 grep 在 LC_ALL=C 下仍把 UTF-8 多字节序列当作 [:print:]，用后者会漏报
+# 中文注释（v0.3.26 后 install-windows.ps1 混入中文注释就是这么溜过去的，只有 CI 的
+# PowerShell 判定 [^\x00-\x7F] 抓到了，导致 CI 连红数天）。
 BAT_NONASCII_LOG="$TMP_DIR/bat-nonascii.txt"
-if LC_ALL=C grep -n '[^[:print:][:space:]]' "$ROOT_DIR/install/install-windows.bat" > "$BAT_NONASCII_LOG"; then
+if LC_ALL=C grep -n '[^[:space:] -~]' "$ROOT_DIR/install/install-windows.bat" > "$BAT_NONASCII_LOG"; then
     echo "错误: install/install-windows.bat 必须保持纯 ASCII，避免 Windows cmd 编码解析失败"
     cat "$BAT_NONASCII_LOG"
     exit 1
 fi
 rm -f "$BAT_NONASCII_LOG"
 INSTALL_PS1_NONASCII_LOG="$TMP_DIR/install-ps1-nonascii.txt"
-if LC_ALL=C grep -n '[^[:print:][:space:]]' "$ROOT_DIR/install/install-windows.ps1" > "$INSTALL_PS1_NONASCII_LOG"; then
+if LC_ALL=C grep -n '[^[:space:] -~]' "$ROOT_DIR/install/install-windows.ps1" > "$INSTALL_PS1_NONASCII_LOG"; then
     echo "错误: install/install-windows.ps1 必须保持纯 ASCII，避免 Windows PowerShell 5.1 编码解析失败"
     cat "$INSTALL_PS1_NONASCII_LOG"
     exit 1
 fi
 rm -f "$INSTALL_PS1_NONASCII_LOG"
 PS1_NONASCII_LOG="$TMP_DIR/ps1-nonascii.txt"
-if LC_ALL=C grep -n '[^[:print:][:space:]]' "$ROOT_DIR/install/sync-profile-bound-files.ps1" > "$PS1_NONASCII_LOG"; then
+if LC_ALL=C grep -n '[^[:space:] -~]' "$ROOT_DIR/install/sync-profile-bound-files.ps1" > "$PS1_NONASCII_LOG"; then
     echo "错误: install/sync-profile-bound-files.ps1 必须保持纯 ASCII，避免 Windows PowerShell 5.1 编码解析失败"
     cat "$PS1_NONASCII_LOG"
     exit 1
