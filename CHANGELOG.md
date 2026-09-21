@@ -1,5 +1,12 @@
 # Changelog
 
+## v0.3.28
+
+- 修复 `install/install-windows.ps1` 的编码：v0.3.26 之后提交的安装器加固在该文件里加了两行中文注释，而 PowerShell 5.1 读取无 BOM 的 `.ps1` 会按 ANSI 代码页解码，违反「该文件必须保持纯 ASCII」的约定。CI 的纯 ASCII 守护因此从 v0.3.26 起持续失败（仅 windows 作业），约一周未被察觉。注释改为英文，脚本行为完全不变。
+- 修复发布门禁里的纯 ASCII 判定：原判定 `[^[:print:][:space:]]` 在 macOS 的 grep 下即使加 `LC_ALL=C`，仍会把 UTF-8 多字节序列当作可打印字符，对中文**完全漏报**——本地门禁的「通过」是假通过，这也是上一版包内混入中文注释却过检的原因。改用字节区间 `[^[:space:] -~]`，与 CI 侧 PowerShell 的 `[^\x00-\x7F]` 判定等效。
+- 发版脚本新增工作树守卫：打正式包（带版本号参数）时若存在未提交改动，直接拒绝并列出文件，避免产物与版本号对应的提交不一致；不带参数打 dev 包时保持宽松。
+- CI workflow 的 `actions/checkout` 与 `actions/setup-node` 升级到 v7，消除 GitHub Actions 的 Node 20 弃用告警。
+
 ## v0.3.27
 
 - 补齐此前已提交但未发版的安装器加固：macOS 改用 `pgrep -i` 子串匹配覆盖 `clash-verge-service` 等变体名，带空格的 GUI 进程名用 `-x` 精确匹配；Windows 改用 `Get-Process -Name` 通配（`clash-verge*` / `Clash Verge*` / `verge-mihomo*` / `mihomo`），堵住"内核仍在运行但被漏检"的边缘场景。
