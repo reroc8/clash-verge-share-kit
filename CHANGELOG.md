@@ -1,5 +1,12 @@
 # Changelog
 
+## v0.3.30
+
+- `docs/routing.md` 补充「WorkBuddy 遥测强制代理」章节：记录 v0.3.29 引入的 `DOMAIN-SUFFIX,tgalileo.com,Proxies` 的位次要求（必须留在 `cn-domain` 之前——它是唯一会把该域判成直连的规则集，`applications` 与 `global-domain` 实测都不含该域）、SNI 可见性只是转移而非消除的取舍，以及目标组 `Proxies` 含 `DIRECT` 选项这一前提。
+- `tests/test-script.js` 为该规则补回归断言：既断言规则必须留在 `Merge.yaml`，也断言位次必须早于 `cn-domain` 与 `applications`。位次是这条规则生效的唯一前提，只断言「存在」不足以防回归——已验证把规则挪到 `cn-domain` 之后，测试会以预期信息失败。
+- 收紧措辞（v0.3.29 的 CHANGELOG 条目与 Release Notes 作为已发布记录保留不动，修正记录在此）：该规则实际位于「两条私网规则与钉钉进程规则之后」，并非「所有规则集之前」；「避免遥测 SNI 对 ISP 可见」实为把可见性转移给代理节点，属取舍而非消除。`Merge.yaml` 内的注释已同步改写。
+- 本版不含路由行为变更：规则本身与 v0.3.29 完全一致，仅补文档、断言与措辞。
+
 ## v0.3.29
 
 - `Merge.yaml` 新增精确规则 `DOMAIN-SUFFIX,tgalileo.com,Proxies`（置于钉钉进程规则之后、所有规则集之前）：WorkBuddy AI 国际版的海外遥测端点（实测 `sg.tgalileo.com` 解析到新加坡 43.156.86.0/24）原被 `cn-domain` 规则集按腾讯系域名归为国内直连，现改走代理——避免遥测 SNI 对 ISP 可见，且海外端点经代理链路的质量优于直连国际线路。国内版遥测 `galileotelemetry.tencent.com`（广东联通节点）不受影响，继续直连。

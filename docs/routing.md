@@ -53,6 +53,18 @@ Claude / AI / Google / YouTube / Telegram / Exchange / US / TW / SG / HK / JP / 
 
 验证工具：`scripts/clash-monitor.sh` 通过内核 Unix socket（`/tmp/verge/verge-mihomo.sock`，无需开启外部控制器 TCP 端口）按进程聚合实时上传/下载流量，日志输出到 `monitor/clash-traffic.log`，可用于复查某应用是否仍在消耗代理流量。
 
+WorkBuddy 遥测强制代理：
+
+WorkBuddy AI 国际版的遥测端点 `sg.tgalileo.com` 解析到腾讯云新加坡（43.156.86.0/24），但该域在 `cn-domain` 规则集里（`+.tgalileo.com`），按常规会被判为国内直连。因此在业务规则区最前面加了一条精确规则：
+
+```yaml
+- DOMAIN-SUFFIX,tgalileo.com,Proxies
+```
+
+位次在两条私网规则与钉钉进程规则之后、其余业务规则与规则集之前。这是「国内域名直连」原则的一个已知例外，且**必须留在 `cn-domain` 之前**：`cn-domain` 是唯一会把该域劫持成直连的规则集（`applications` 与 `global-domain` 实测都不含它），一旦排到后面，这条规则就等于没写。`tests/test-script.js` 对此有位次断言。
+
+取舍：该规则把遥测 SNI 从「对 ISP 可见」变为「对代理节点可见」，并非消除可见性；换来的是 ISP 侧看不到该 SNI，以及海外端点走代理链路的质量。另外目标组 `Proxies` 是可手动选择、且选项里含 `DIRECT` 的通用组，是否真的走代理取决于用户当前选择（`DIRECT` 排在最后，默认第一项是真节点，实际会走代理）。国内版遥测 `galileotelemetry.tencent.com` 命中 `cn-domain` 的 `+.tencent.com`，继续直连。
+
 兼容策略：
 
 - 安装脚本不再要求订阅必须有固定策略组名。

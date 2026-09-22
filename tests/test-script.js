@@ -280,7 +280,8 @@ function groupByName(config, name) {
     "DOMAIN,openaiassets.blob.core.windows.net,AI",
     "DOMAIN,notebooklm.googleapis.com,AI",
     "DOMAIN-SUFFIX,gemini.gstatic.com,AI",
-    "DOMAIN-SUFFIX,generativeai.google,AI"
+    "DOMAIN-SUFFIX,generativeai.google,AI",
+    "DOMAIN-SUFFIX,tgalileo.com,Proxies"
   ];
   for (const rule of requiredBusinessRules) {
     assert(mergeSource.includes(`- ${rule}`), `${rule} must remain in Merge.yaml`);
@@ -292,6 +293,20 @@ function groupByName(config, name) {
   assert(applicationsIndex > 0, "applications rule must exist");
   assert(applicationsIndex < cnDomainIndex, "applications must run before the domestic base layer");
   assert(applicationsIndex < globalDomainIndex, "applications must run before the global base layer");
+
+  // tgalileo.com 唯一会被 cn-domain（+.tgalileo.com）劫持成 DIRECT，位次是这条规则生效的唯一前提，
+  // 所以只断言"规则存在"不够：必须同时盯住位次。applications / global-domain 实测不含该域，
+  // 但保持业务规则在通用直连层之前的约定，属廉价保险。
+  const tgalileoIndex = mergeSource.indexOf("- DOMAIN-SUFFIX,tgalileo.com,Proxies");
+  assert(tgalileoIndex > 0, "tgalileo rule must exist");
+  assert(
+    tgalileoIndex < cnDomainIndex,
+    "tgalileo rule must precede the domestic base layer, otherwise cn-domain sends it to DIRECT"
+  );
+  assert(
+    tgalileoIndex < applicationsIndex,
+    "tgalileo rule must precede the generic application bypass layer"
+  );
   for (const domain of ["t.me", "telegra.ph", "telegram-cdn.org", "telegram.org", "telesco.pe"]) {
     assert(
       mergeSource.includes(`- DOMAIN-SUFFIX,${domain},Telegram`),
