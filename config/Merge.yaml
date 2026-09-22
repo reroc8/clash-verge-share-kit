@@ -97,6 +97,11 @@ rules:
   # DingMeeting 等）的任何连接都不会被后面的精确域名/规则集抢先送进代理。
   # 已知取舍：钉钉内置浏览器打开 Claude/AI 等需代理站点时同样直连（无法加载）。
   - PROCESS-NAME-REGEX,(?i)ding(talk|meeting),DIRECT
+  # WorkBuddy AI 国际版海外遥测（sg.tgalileo.com 解析到新加坡，实测被 cn-domain
+  # 规则集按腾讯系域名误归为国内直连）。前置精确规则改走代理：避免遥测 SNI 对
+  # ISP 可见，且海外节点到海外端点的链路质量优于直连国际线路。
+  # 国内版遥测走 galileotelemetry.tencent.com（.tencent.com 域），不受此规则影响。
+  - DOMAIN-SUFFIX,tgalileo.com,Proxies
   # Google account / auth / billing stay on the stable Google group
   - DOMAIN,accounts.google.com,Google
   - DOMAIN,myaccount.google.com,Google
