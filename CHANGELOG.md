@@ -1,5 +1,9 @@
 # Changelog
 
+## v0.3.29
+
+- `Merge.yaml` 新增精确规则 `DOMAIN-SUFFIX,tgalileo.com,Proxies`（置于钉钉进程规则之后、所有规则集之前）：WorkBuddy AI 国际版的海外遥测端点（实测 `sg.tgalileo.com` 解析到新加坡 43.156.86.0/24）原被 `cn-domain` 规则集按腾讯系域名归为国内直连，现改走代理——避免遥测 SNI 对 ISP 可见，且海外端点经代理链路的质量优于直连国际线路。国内版遥测 `galileotelemetry.tencent.com`（广东联通节点）不受影响，继续直连。
+
 ## v0.3.28
 
 - 修复 `install/install-windows.ps1` 的编码：v0.3.26 之后提交的安装器加固在该文件里加了两行中文注释，而 PowerShell 5.1 读取无 BOM 的 `.ps1` 会按 ANSI 代码页解码，违反「该文件必须保持纯 ASCII」的约定。CI 的纯 ASCII 守护因此从 v0.3.26 起持续失败（仅 windows 作业），约一周未被察觉。注释改为英文，脚本行为完全不变。
