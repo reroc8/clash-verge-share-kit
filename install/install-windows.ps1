@@ -201,11 +201,13 @@ try {
     if ($runningGui.Count -gt 0) {
         Say-B64 '6ZSZ6K+vOiBDbGFzaCBWZXJnZSBSZXYg5LuN5Zyo6L+Q6KGM77yM5a6J6KOF5Zmo5peg5rOV6Ieq5Yqo5riF6YCA44CC'
         Say-B64 '6K+354K55byAIENsYXNoIFZlcmdlIFJldiDnqpflj6PvvIzmiJbnlKjmiZjnm5jlm77moIfoj5zljZXph4znmoTjgIzpgIDlh7rjgI3vvJvnm7TmjqXlhbPnqpflj6Plj6rmmK/mnIDlsI/ljJbliLDmiZjnm5jvvIzov5vnqIvku43lnKjov5DooYzjgII='
+        Say-B64 '5oiW6ICF5Y+M5Ye75ZCM55uu5b2V5LiL55qE44CMV2luZG93c+WFs+mXrUNsYXNoLmJhdOOAje+8jOWug+S8muW4ruS9oOWFs+aOie+8jOeEtuWQjumHjeaWsOi/kOihjOWuieijheWZqA=='
         exit 1
     }
 
     if ($runningKernel.Count -gt 0) {
         Say-B64 '5o+Q56S6OiDlhoXmoLjku43lnKjov5DooYzvvIzkuJTnlLHnrqHnkIblkZjmnYPpmZDlkK/liqjvvIjmnI3liqHmqKHlvI/vvInvvIzlronoo4Xlmajml6DmnYPnu5PmnZ/lroPjgILkuI3lvbHlk43lronoo4XvvIzkvYbor7flronoo4XlrozmiJDlkI7ph43mlrDmiZPlvIAgQ2xhc2ggVmVyZ2UgUmV2IOiuqeaWsOmFjee9rueUn+aViOOAgg=='
+        Say-B64 '6Iul6KaB546w5Zyo57uT5p2f5YaF5qC477yM5Y+M5Ye75ZCM55uu5b2V5LiL55qE44CMV2luZG93c+WFs+mXrUNsYXNoLmJhdOOAjQ=='
     }
 
     # Best-effort stop of the helper service. It needs admin rights and never

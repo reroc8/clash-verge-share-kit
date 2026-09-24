@@ -1,5 +1,17 @@
 # Changelog
 
+## v0.3.32
+
+- 新增可手动运行的「关闭进程」脚本，安装器关不掉时操作者有自己的出口：
+  - `macOS关闭Clash.command`（仓库里是 `install/close-clash-macos.command`）；
+  - `Windows关闭Clash.bat` + `close-clash-windows.ps1`（仓库里是 `install/` 下同名文件）。
+  - 两者都先温和结束、未响应的再强制结束；内核若是服务模式下由管理员权限启动的，普通权限结束不了，macOS 侧会询问是否用管理员权限（需输密码），Windows 侧提示右键「以管理员身份运行」并可直接重启自身提权。
+  - 常驻助手 `clash-verge-service` 只报告不处理：它是系统服务，退出 Clash 后照常在跑属正常，不影响安装。
+- 安装器的失败提示改为指向该脚本：清退失败时不再只说「请手动退出」，而是明确给出「双击同目录下的 `macOS关闭Clash.command` / `Windows关闭Clash.bat`」。
+- 打包与门禁同步：新增文件进入 Release 包（`macOS关闭Clash.command` 带可执行位、中文名条目带 UTF-8 标志位）；纯 ASCII 门禁与 `bash -n` 覆盖新文件；CI 的 Windows 作业也把 `close-clash-windows.ps1` / `close-clash-windows.bat` 纳入纯 ASCII 检查。
+- 打包脚本的纯 ASCII 门禁改为列表驱动（`ASCII_ONLY_FILES`），以后新增同类文件只需加一行；Windows 侧 CRLF 转换同样改为列表驱动。
+- 安装器回归测试新增三个场景：无进程时关闭脚本应直接退出且不调用 `pkill`；GUI 在跑时应关掉并报告成功；安装器清退失败时提示里必须出现该脚本名。
+
 ## v0.3.31
 
 - 修复「已经退出 Clash 却仍提示检测到 Clash Verge Rev 或内核仍在运行」：根因是安装器的检测用了宽松匹配 `pgrep -i "clash-verge"`，它会命中 `clash-verge-service` —— 那是 launchd 的常驻助手（`RunAtLoad` + `KeepAlive`），退出 Clash 后照常在跑，于是任何开了服务模式的机器都会被误判。现在 GUI 判定改为只认当前用户的进程（`pgrep -u "$(id -u)"`），常驻助手不再计入阻断条件；Windows 侧同理，原先的 `clash-verge*` 通配也会命中 `clash-verge-service.exe`，现改为精确名 `clash-verge`。

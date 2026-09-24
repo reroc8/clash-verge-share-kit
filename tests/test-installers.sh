@@ -289,4 +289,72 @@ grep -Fqx 'old default merge' "$RUN3_CLASH/profiles/Merge.yaml" || { echo "auto-
 test -z "$(find "$RUN3_CLASH" -maxdepth 1 -type d -name 'backup_*' -print)" || { echo "auto-quit failure: no backup must be taken"; exit 1; }
 echo "auto-quit failure (GUI survives): installer aborts without touching files"
 
+# --- 独立的「关闭 Clash」脚本 ---
+CLOSE_SCRIPT="$ROOT_DIR/install/close-clash-macos.command"
+
+# 4a. 什么都没跑：应当直接退出 0，且不调用 pkill
+CLOSE1_HOME="$TMP_HOME/close1"
+make_running_env "$CLOSE1_HOME"
+printf '%s\n' '#!/usr/bin/env sh' 'exit 1' > "$CLOSE1_HOME/bin/pgrep"
+chmod +x "$CLOSE1_HOME/bin/pgrep"
+write_fake_pkill "$CLOSE1_HOME/bin"
+CLOSE1_LOG="$CLOSE1_HOME/close.log"
+CLOSE1_PKILL_BEFORE="$(wc -l < "$FAKE_PKILL_LOG" | tr -d ' ')"
+if ! PATH="$CLOSE1_HOME/bin:$PATH" bash "$CLOSE_SCRIPT" > "$CLOSE1_LOG" 2>&1 < /dev/null; then
+    echo "close script: must exit 0 when nothing is running"
+    cat "$CLOSE1_LOG"
+    exit 1
+fi
+grep -Fq '无需操作' "$CLOSE1_LOG" || { echo "close script: expected a no-op message"; cat "$CLOSE1_LOG"; exit 1; }
+CLOSE1_PKILL_AFTER="$(wc -l < "$FAKE_PKILL_LOG" | tr -d ' ')"
+if [ "$CLOSE1_PKILL_BEFORE" != "$CLOSE1_PKILL_AFTER" ]; then
+    echo "close script: must not call pkill when nothing is running"
+    exit 1
+fi
+echo "close script (nothing running): no-op"
+
+# 4b. GUI 在跑：应当关掉它并报告成功
+CLOSE2_HOME="$TMP_HOME/close2"
+make_running_env "$CLOSE2_HOME"
+CLOSE2_STATE="$CLOSE2_HOME/gui-running"
+: > "$CLOSE2_STATE"
+cat > "$CLOSE2_HOME/bin/pgrep" <<FAKE
+#!/usr/bin/env sh
+if [ -f "$CLOSE2_STATE" ]; then
+    case "\$*" in
+        *"-u "*) echo 4242; exit 0 ;;
+    esac
+fi
+exit 1
+FAKE
+cat > "$CLOSE2_HOME/bin/pkill" <<FAKE
+#!/usr/bin/env sh
+printf "%s\n" "\$*" >> "\${FAKE_PKILL_LOG:-/dev/null}"
+rm -f "$CLOSE2_STATE"
+exit 0
+FAKE
+chmod +x "$CLOSE2_HOME/bin/pgrep" "$CLOSE2_HOME/bin/pkill"
+CLOSE2_LOG="$CLOSE2_HOME/close.log"
+CLOSE2_PKILL_BEFORE="$(wc -l < "$FAKE_PKILL_LOG" | tr -d ' ')"
+if ! PATH="$CLOSE2_HOME/bin:$PATH" bash "$CLOSE_SCRIPT" > "$CLOSE2_LOG" 2>&1 < /dev/null; then
+    echo "close script: must exit 0 after stopping the GUI"
+    cat "$CLOSE2_LOG"
+    exit 1
+fi
+grep -Fq '都已关闭' "$CLOSE2_LOG" || { echo "close script: expected a success message"; cat "$CLOSE2_LOG"; exit 1; }
+CLOSE2_PKILL_AFTER="$(wc -l < "$FAKE_PKILL_LOG" | tr -d ' ')"
+if [ "$CLOSE2_PKILL_BEFORE" = "$CLOSE2_PKILL_AFTER" ]; then
+    echo "close script: must call pkill to stop the running GUI"
+    exit 1
+fi
+echo "close script (GUI running): stops it and reports success"
+
+# 4c. 安装器清退失败时，提示必须指向这个文件
+grep -Fq 'macOS关闭Clash.command' "$RUN3_LOG" || {
+    echo "installer must point at the close script when it cannot stop the GUI"
+    cat "$RUN3_LOG"
+    exit 1
+}
+echo "installer points at the close script"
+
 echo "Installer regression tests passed"

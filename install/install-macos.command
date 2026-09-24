@@ -278,16 +278,16 @@ fi
 
 if [ -n "$(clash_gui_pids)" ]; then
     echo "错误: Clash Verge Rev 仍在运行，安装器无法自动清退"
-    echo "请手动退出：点开 Clash Verge Rev 窗口，或用菜单栏图标里的「退出」"
+    echo "请手动操作：点开 Clash Verge Rev 窗口，或用菜单栏图标里的「退出」"
     echo "（直接关窗口只是最小化到菜单栏，进程仍在运行）"
+    echo "或者双击同目录下的「macOS关闭Clash.command」，它会帮你关掉，然后重新运行安装器"
     exit 1
 fi
 
 if [ -n "$(clash_kernel_pids)" ]; then
     echo ">>> 提示: 内核仍在运行，且由管理员权限启动（服务模式），安装器无权结束它"
     echo ">>> 这不影响安装，但请安装完成后重新打开 Clash Verge Rev，让新配置生效"
-    echo ">>> 若要立刻结束内核，可在 Clash Verge Rev 里关闭「服务模式」，或执行:"
-    echo ">>>   sudo pkill -x verge-mihomo"
+    echo ">>> 若要现在结束内核，双击同目录下的「macOS关闭Clash.command」"
 fi
 
 echo ">>> 已确认 Clash Verge Rev 与内核均已退出"

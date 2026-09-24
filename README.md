@@ -33,6 +33,8 @@
 
 若 Clash Verge Rev 开着「服务模式」，内核由管理员权限启动，安装器无权结束它——这不影响安装，装完重新打开 Clash Verge Rev 让新配置生效即可。
 
+万一安装器提示关不掉（界面进程卡住，或内核是管理员权限启动的），双击包内的 `macOS关闭Clash.command`（Mac）/ `Windows关闭Clash.bat`（Windows）可以手动关掉它；Windows 上还可以右键该文件选「以管理员身份运行」，这样连管理员权限启动的内核也能结束。
+
 ## 备份还原
 
 1. 完全退出 Clash Verge Rev。
@@ -69,7 +71,7 @@
 
 ```text
 config/    Merge.yaml · Script.js · verge.yaml · dns_config.yaml
-install/   macOS · Windows 安装脚本
+install/   macOS · Windows 安装脚本与「关闭进程」脚本
 scripts/   构建 · 敏感扫描 · 流量监控（clash-monitor.sh）
 tests/     回归测试
 docs/      路由设计文档

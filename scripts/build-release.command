@@ -104,7 +104,9 @@ else
 fi
 
 bash -n "$ROOT_DIR/install/install-macos.command"
+bash -n "$ROOT_DIR/install/close-clash-macos.command"
 bash -n "$ROOT_DIR/macOS点我安装.command"
+bash -n "$ROOT_DIR/macOS关闭Clash.command"
 bash -n "$ROOT_DIR/scripts/check-sensitive.sh"
 bash -n "$ROOT_DIR/tests/test-installers.sh"
 bash "$ROOT_DIR/tests/test-installers.sh"
@@ -143,33 +145,36 @@ cp "$ROOT_DIR/install/install-windows.bat"   "$TMP_DIR/Windows点我安装.bat"
 cp "$ROOT_DIR/install/install-windows.ps1"   "$TMP_DIR/install-windows.ps1"
 cp "$ROOT_DIR/install/install-macos.command" "$TMP_DIR/macOS点我安装.command"
 cp "$ROOT_DIR/install/sync-profile-bound-files.ps1" "$TMP_DIR/sync-profile-bound-files.ps1"
+cp "$ROOT_DIR/install/close-clash-windows.bat"   "$TMP_DIR/Windows关闭Clash.bat"
+cp "$ROOT_DIR/install/close-clash-windows.ps1"   "$TMP_DIR/close-clash-windows.ps1"
+cp "$ROOT_DIR/install/close-clash-macos.command" "$TMP_DIR/macOS关闭Clash.command"
 # 纯 ASCII 门禁：判定必须用字节区间 [^[:space:] -~]，不能用 [^[:print:][:space:]]。
 # macOS 自带 grep 在 LC_ALL=C 下仍把 UTF-8 多字节序列当作 [:print:]，用后者会漏报
 # 中文注释（v0.3.26 后 install-windows.ps1 混入中文注释就是这么溜过去的，只有 CI 的
 # PowerShell 判定 [^\x00-\x7F] 抓到了，导致 CI 连红数天）。
-BAT_NONASCII_LOG="$TMP_DIR/bat-nonascii.txt"
-if LC_ALL=C grep -n '[^[:space:] -~]' "$ROOT_DIR/install/install-windows.bat" > "$BAT_NONASCII_LOG"; then
-    echo "错误: install/install-windows.bat 必须保持纯 ASCII，避免 Windows cmd 编码解析失败"
-    cat "$BAT_NONASCII_LOG"
-    exit 1
-fi
-rm -f "$BAT_NONASCII_LOG"
-INSTALL_PS1_NONASCII_LOG="$TMP_DIR/install-ps1-nonascii.txt"
-if LC_ALL=C grep -n '[^[:space:] -~]' "$ROOT_DIR/install/install-windows.ps1" > "$INSTALL_PS1_NONASCII_LOG"; then
-    echo "错误: install/install-windows.ps1 必须保持纯 ASCII，避免 Windows PowerShell 5.1 编码解析失败"
-    cat "$INSTALL_PS1_NONASCII_LOG"
-    exit 1
-fi
-rm -f "$INSTALL_PS1_NONASCII_LOG"
-PS1_NONASCII_LOG="$TMP_DIR/ps1-nonascii.txt"
-if LC_ALL=C grep -n '[^[:space:] -~]' "$ROOT_DIR/install/sync-profile-bound-files.ps1" > "$PS1_NONASCII_LOG"; then
-    echo "错误: install/sync-profile-bound-files.ps1 必须保持纯 ASCII，避免 Windows PowerShell 5.1 编码解析失败"
-    cat "$PS1_NONASCII_LOG"
-    exit 1
-fi
-rm -f "$PS1_NONASCII_LOG"
-perl -0pi -e 's/\r?\n/\r\n/g' "$TMP_DIR/install-windows.ps1"
-perl -0pi -e 's/\r?\n/\r\n/g' "$TMP_DIR/sync-profile-bound-files.ps1"
+# 以后新增必须纯 ASCII 的文件，只在这个列表里加一行即可。
+ASCII_ONLY_FILES=(
+    "install/install-windows.bat"
+    "install/install-windows.ps1"
+    "install/sync-profile-bound-files.ps1"
+    "install/close-clash-windows.bat"
+    "install/close-clash-windows.ps1"
+)
+NONASCII_LOG="$(mktemp)"
+for ascii_file in "${ASCII_ONLY_FILES[@]}"; do
+    if LC_ALL=C grep -n '[^[:space:] -~]' "$ROOT_DIR/$ascii_file" > "$NONASCII_LOG"; then
+        echo "错误: $ascii_file 必须保持纯 ASCII（Windows cmd / PowerShell 5.1 按 ANSI 解码，中文会乱码或解析失败）"
+        cat "$NONASCII_LOG"
+        rm -f "$NONASCII_LOG"
+        exit 1
+    fi
+done
+rm -f "$NONASCII_LOG"
+
+# Windows 侧的 bat / ps1 统一转 CRLF
+for crlf_file in "install-windows.ps1" "sync-profile-bound-files.ps1" "Windows点我安装.bat" "Windows关闭Clash.bat" "close-clash-windows.ps1"; do
+    perl -0pi -e 's/\r?\n/\r\n/g' "$TMP_DIR/$crlf_file"
+done
 echo "$PACKAGE_VERSION" > "$TMP_DIR/VERSION.txt"
 
 {
@@ -202,10 +207,12 @@ for needed_section in "安装后 60 秒检查清单"; do
     fi
 done
 
-perl -0pi -e 's/\r?\n/\r\n/g' "$TMP_DIR/Windows点我安装.bat"
-
 if ! grep -q "install-windows.ps1" "$TMP_DIR/Windows点我安装.bat"; then
     echo "错误: Windows 安装入口必须只负责启动 install-windows.ps1"
+    exit 1
+fi
+if ! grep -q "close-clash-windows.ps1" "$TMP_DIR/Windows关闭Clash.bat"; then
+    echo "错误: Windows 关闭进程入口必须只负责启动 close-clash-windows.ps1"
     exit 1
 fi
 if ! grep -q "5a6J6KOF5a6M5oiQ44CC" "$TMP_DIR/install-windows.ps1"; then
@@ -230,13 +237,16 @@ import zipfile
 dest = Path(sys.argv[1])
 root = Path(".")
 
+# 需要可执行位的文件（双击即可运行）；其余一律 0644
+EXECUTABLE_FILES = {"macOS点我安装.command", "macOS关闭Clash.command"}
+
 with zipfile.ZipFile(dest, "w", compression=zipfile.ZIP_DEFLATED) as archive:
     for path in sorted(root.rglob("*"), key=lambda item: item.as_posix()):
         if not path.is_file():
             continue
         archive_name = path.as_posix()
         info = zipfile.ZipInfo(archive_name)
-        permission_bits = 0o755 if archive_name == "macOS点我安装.command" else 0o644
+        permission_bits = 0o755 if archive_name in EXECUTABLE_FILES else 0o644
         info.date_time = time.localtime(path.stat().st_mtime)[:6]
         info.compress_type = zipfile.ZIP_DEFLATED
         info.external_attr = ((0o100000 | permission_bits) & 0xFFFF) << 16
@@ -249,6 +259,9 @@ with zipfile.ZipFile(dest) as archive:
         "install-windows.ps1",
         "macOS点我安装.command",
         "sync-profile-bound-files.ps1",
+        "Windows关闭Clash.bat",
+        "close-clash-windows.ps1",
+        "macOS关闭Clash.command",
         "README.txt",
         "VERSION.txt",
     }
@@ -256,13 +269,19 @@ with zipfile.ZipFile(dest) as archive:
     if missing:
         raise SystemExit("missing release files: " + ", ".join(missing))
 
-    for name in ["Windows点我安装.bat", "macOS点我安装.command"]:
+    # 中文名条目必须带 UTF-8 标志位，否则老版本 Windows 解压会乱码
+    for name in [
+        "Windows点我安装.bat",
+        "macOS点我安装.command",
+        "Windows关闭Clash.bat",
+        "macOS关闭Clash.command",
+    ]:
         cn_info = archive.getinfo(name)
         if not (cn_info.flag_bits & 0x800):
             raise SystemExit(f"{name} is not marked as UTF-8 in zip")
 
     for item in archive.infolist():
-        expected_mode = 0o755 if item.filename == "macOS点我安装.command" else 0o644
+        expected_mode = 0o755 if item.filename in EXECUTABLE_FILES else 0o644
         actual_mode = (item.external_attr >> 16) & 0o777
         if actual_mode != expected_mode:
             raise SystemExit(f"{item.filename} mode is {oct(actual_mode)}, expected {oct(expected_mode)}")

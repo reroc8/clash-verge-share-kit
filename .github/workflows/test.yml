@@ -58,9 +58,13 @@ jobs:
         shell: pwsh
         run: |
           pwsh -NoProfile -File tests/test-windows-sync.ps1
-          foreach ($file in @('install/install-windows.ps1', 'install/sync-profile-bound-files.ps1')) {
+          foreach ($file in @('install/install-windows.ps1', 'install/sync-profile-bound-files.ps1', 'install/close-clash-windows.ps1')) {
             $content = [System.IO.File]::ReadAllText((Join-Path $env:GITHUB_WORKSPACE $file))
             if ($content -match '[^\x00-\x7F]') { throw "$file must stay pure ASCII (PowerShell 5.1)"; }
+          }
+          foreach ($file in @('install/install-windows.bat', 'install/close-clash-windows.bat')) {
+            $content = [System.IO.File]::ReadAllText((Join-Path $env:GITHUB_WORKSPACE $file))
+            if ($content -match '[^\x00-\x7F]') { throw "$file must stay pure ASCII (cmd)"; }
           }
 
       - name: Sensitive info scan
@@ -71,7 +75,9 @@ jobs:
         if: runner.os != 'Windows'
         run: |
           bash -n install/install-macos.command
+          bash -n install/close-clash-macos.command
           bash -n "macOS点我安装.command"
+          bash -n "macOS关闭Clash.command"
           bash -n scripts/check-sensitive.sh
           bash -n scripts/build-release.command
           bash -n tests/test-installers.sh
