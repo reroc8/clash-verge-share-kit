@@ -26,6 +26,24 @@ mkdir -p "$PROFILES_DIR" "$TMP_HOME/bin"
 printf '%s\n' '#!/usr/bin/env sh' 'exit 1' > "$TMP_HOME/bin/pgrep"
 chmod +x "$TMP_HOME/bin/pgrep"
 
+# 假 pkill：记录每次调用，并按 FAKE_PKILL_STATE 决定是否"让进程消失"（模拟清退成功）。
+# 每个场景的 bin 目录都必须放一个：安装器在检测到进程时会真的执行 pkill，
+# PATH 里没有替身就会命中开发者正在用的 Clash —— 踩过，反向验证时误杀了本机 GUI。
+FAKE_PKILL_LOG="$TMP_HOME/pkill-calls.txt"
+: > "$FAKE_PKILL_LOG"
+export FAKE_PKILL_LOG
+write_fake_pkill() {
+    mkdir -p "$1"
+    {
+        echo '#!/usr/bin/env sh'
+        echo 'printf "%s\n" "$*" >> "${FAKE_PKILL_LOG:-/dev/null}"'
+        echo 'if [ -n "${FAKE_PKILL_STATE:-}" ]; then rm -f "$FAKE_PKILL_STATE"; fi'
+        echo 'exit 0'
+    } > "$1/pkill"
+    chmod +x "$1/pkill"
+}
+write_fake_pkill "$TMP_HOME/bin"
+
 printf '%s\n' 'old root verge' > "$CLASH_DIR/verge.yaml"
 printf '%s\n' 'old root dns' > "$CLASH_DIR/dns_config.yaml"
 printf '%s\n' 'old default merge' > "$PROFILES_DIR/Merge.yaml"
@@ -147,5 +165,128 @@ test "$MARKED_COUNT" -eq 5 || { echo "expected 5 marked auto backups, got $MARKE
 test "$MANUAL_COUNT" -eq 1 || { echo "expected 1 manual backup to survive, got $MANUAL_COUNT"; exit 1; }
 test "$COLLISION_COUNT" -eq 1 || { echo "expected colliding unmarked directory to survive"; exit 1; }
 test "$TOTAL_COUNT" -eq 7 || { echo "expected 7 backup dirs total, got $TOTAL_COUNT"; exit 1; }
+
+# 前三段场景里没有任何进程被报告为在运行，安装器就不该调用 pkill
+if [ -s "$FAKE_PKILL_LOG" ]; then
+    echo "pkill must not be called when nothing is reported as running"
+    cat "$FAKE_PKILL_LOG"
+    exit 1
+fi
+
+# --- running-process detection and cleanup ---
+# 造一套最小环境：数据目录存在、四个目标文件都是旧内容
+make_running_env() {
+    env_home="$1"
+    env_clash="$env_home/Library/Application Support/io.github.clash-verge-rev.clash-verge-rev"
+    mkdir -p "$env_clash/profiles" "$env_home/bin"
+    printf '%s\n' 'old root verge' > "$env_clash/verge.yaml"
+    printf '%s\n' 'old root dns' > "$env_clash/dns_config.yaml"
+    printf '%s\n' 'old default merge' > "$env_clash/profiles/Merge.yaml"
+    printf '%s\n' 'old default script' > "$env_clash/profiles/Script.js"
+}
+
+# 场景 1：只有 root 的常驻服务 clash-verge-service 在跑。
+# 这是本次修复的核心回归点——旧版用宽松的 `pgrep -i "clash-verge"`（不带 -u）会命中
+# 这个 launchd 常驻进程，于是"用户已经退出 Clash 却仍被判定为在运行"。
+# 假 pgrep 如实模拟真实语义：宽松查询命中服务，带 -u <自己> 的 GUI 查询与内核查询都不命中。
+RUN1_HOME="$TMP_HOME/running1"
+make_running_env "$RUN1_HOME"
+cat > "$RUN1_HOME/bin/pgrep" <<'FAKE'
+#!/usr/bin/env sh
+case "$*" in
+  *"-u "*) exit 1 ;;
+  *clash-verge*) echo 999; exit 0 ;;
+  *) exit 1 ;;
+esac
+FAKE
+chmod +x "$RUN1_HOME/bin/pgrep"
+write_fake_pkill "$RUN1_HOME/bin"
+RUN1_LOG="$RUN1_HOME/install.log"
+RUN1_PKILL_BEFORE="$(wc -l < "$FAKE_PKILL_LOG" | tr -d ' ')"
+if ! PATH="$RUN1_HOME/bin:$PATH" HOME="$RUN1_HOME" bash "$ROOT_DIR/install/install-macos.command" > "$RUN1_LOG" 2>&1 < /dev/null; then
+    echo "service-only: installer must proceed when only the root helper service runs"
+    cat "$RUN1_LOG"
+    exit 1
+fi
+if grep -Fq '正在尝试清退' "$RUN1_LOG"; then
+    echo "service-only: installer must not try to kill anything"
+    cat "$RUN1_LOG"
+    exit 1
+fi
+RUN1_PKILL_AFTER="$(wc -l < "$FAKE_PKILL_LOG" | tr -d ' ')"
+if [ "$RUN1_PKILL_BEFORE" != "$RUN1_PKILL_AFTER" ]; then
+    echo "service-only: installer must not call pkill for the root helper service"
+    exit 1
+fi
+echo "service-only (root helper): installer proceeds"
+
+# 场景 2：GUI 在跑，但能被清退 —— 安装器应自动清退后继续
+RUN2_HOME="$TMP_HOME/running2"
+make_running_env "$RUN2_HOME"
+RUN2_STATE="$RUN2_HOME/clash-gui-running"
+: > "$RUN2_STATE"
+cat > "$RUN2_HOME/bin/pgrep" <<FAKE
+#!/usr/bin/env sh
+if [ -f "$RUN2_STATE" ]; then
+    case "\$*" in
+        *"-u "*) echo 4242; exit 0 ;;
+    esac
+fi
+exit 1
+FAKE
+cat > "$RUN2_HOME/bin/pkill" <<FAKE
+#!/usr/bin/env sh
+printf "%s\n" "\$*" >> "\${FAKE_PKILL_LOG:-/dev/null}"
+rm -f "$RUN2_STATE"
+exit 0
+FAKE
+chmod +x "$RUN2_HOME/bin/pgrep" "$RUN2_HOME/bin/pkill"
+RUN2_LOG="$RUN2_HOME/install.log"
+RUN2_PKILL_BEFORE="$(wc -l < "$FAKE_PKILL_LOG" | tr -d ' ')"
+if ! PATH="$RUN2_HOME/bin:$PATH" HOME="$RUN2_HOME" bash "$ROOT_DIR/install/install-macos.command" > "$RUN2_LOG" 2>&1 < /dev/null; then
+    echo "auto-quit: installer must finish after stopping the running GUI"
+    cat "$RUN2_LOG"
+    exit 1
+fi
+grep -Fq '正在尝试清退' "$RUN2_LOG" || { echo "auto-quit: installer must attempt to stop the running GUI"; cat "$RUN2_LOG"; exit 1; }
+RUN2_PKILL_AFTER="$(wc -l < "$FAKE_PKILL_LOG" | tr -d ' ')"
+if [ "$RUN2_PKILL_BEFORE" = "$RUN2_PKILL_AFTER" ]; then
+    echo "auto-quit: installer must call pkill to stop the running GUI"
+    exit 1
+fi
+echo "auto-quit (GUI stoppable): installer stops it and continues"
+
+# 场景 3：GUI 清退失败 —— 安装器必须中止，且不得改动任何文件
+RUN3_HOME="$TMP_HOME/running3"
+make_running_env "$RUN3_HOME"
+cat > "$RUN3_HOME/bin/pgrep" <<'FAKE'
+#!/usr/bin/env sh
+case "$*" in
+  *"-u "*) echo 4242; exit 0 ;;
+  *) exit 1 ;;
+esac
+FAKE
+cat > "$RUN3_HOME/bin/pkill" <<'FAKE'
+#!/usr/bin/env sh
+printf "%s\n" "$*" >> "${FAKE_PKILL_LOG:-/dev/null}"
+exit 0
+FAKE
+chmod +x "$RUN3_HOME/bin/pgrep" "$RUN3_HOME/bin/pkill"
+RUN3_LOG="$RUN3_HOME/install.log"
+RUN3_PKILL_BEFORE="$(wc -l < "$FAKE_PKILL_LOG" | tr -d ' ')"
+if PATH="$RUN3_HOME/bin:$PATH" HOME="$RUN3_HOME" bash "$ROOT_DIR/install/install-macos.command" > "$RUN3_LOG" 2>&1 < /dev/null; then
+    echo "auto-quit failure: installer must abort when the GUI survives"
+    exit 1
+fi
+grep -Fq '无法自动清退' "$RUN3_LOG" || { echo "auto-quit failure: expected an actionable message"; cat "$RUN3_LOG"; exit 1; }
+RUN3_PKILL_AFTER="$(wc -l < "$FAKE_PKILL_LOG" | tr -d ' ')"
+if [ "$RUN3_PKILL_BEFORE" = "$RUN3_PKILL_AFTER" ]; then
+    echo "auto-quit failure: installer must have tried pkill"
+    exit 1
+fi
+RUN3_CLASH="$RUN3_HOME/Library/Application Support/io.github.clash-verge-rev.clash-verge-rev"
+grep -Fqx 'old default merge' "$RUN3_CLASH/profiles/Merge.yaml" || { echo "auto-quit failure: installer must not touch files"; exit 1; }
+test -z "$(find "$RUN3_CLASH" -maxdepth 1 -type d -name 'backup_*' -print)" || { echo "auto-quit failure: no backup must be taken"; exit 1; }
+echo "auto-quit failure (GUI survives): installer aborts without touching files"
 
 echo "Installer regression tests passed"

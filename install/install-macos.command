@@ -234,19 +234,63 @@ if [ ! -d "$CLASH_DIR" ]; then
     exit 1
 fi
 
-is_clash_running() {
-    # -i 大小写不敏感；clash-verge 用子串匹配以覆盖 clash-verge-service 等，
-    # 带空格的变体名（不同安装方式下 GUI 二进制名）用 -x 精确匹配。
-    pgrep -i "clash-verge" >/dev/null 2>&1 ||
-    pgrep -ix "clash verge" >/dev/null 2>&1 ||
-    pgrep -ix "Clash Verge Rev" >/dev/null 2>&1 ||
-    pgrep -i "mihomo" >/dev/null 2>&1
+# ── 运行中检测与清退 ──
+# 三类进程，处理方式不同：
+#   GUI    clash-verge（属主=当前用户）——退出时会回写 verge.yaml，安装前必须清退；
+#          清退失败则中止安装。
+#   内核   verge-mihomo / verge-mihomo-alpha / mihomo——只读配置，不会改写要安装的
+#          文件；服务模式下由 root 启动，普通用户无权结束，故清退失败只警告不阻断。
+#   服务   clash-verge-service（root，launchd RunAtLoad + KeepAlive 常驻）——退出 Clash
+#          后它照样在跑，普通用户杀不掉，也不改写配置文件，因此不作为阻断条件。
+# 注意：不能用宽松的 `pgrep -i "clash-verge"` 做整体判断——它会命中常驻的服务进程，
+# 造成"已经退出 Clash 却仍被判定为在运行"（旧版就是这个行为）。GUI 判定必须带 -u。
+CLASH_GUI_PATTERN="clash-verge"
+CLASH_GUI_PATTERN_SPACED="clash verge"
+CLASH_KERNEL_PATTERN="mihomo"
+
+clash_gui_pids() {
+    pgrep -u "$(id -u)" -i "$CLASH_GUI_PATTERN" 2>/dev/null
+    pgrep -u "$(id -u)" -i "$CLASH_GUI_PATTERN_SPACED" 2>/dev/null
 }
 
-if is_clash_running; then
-    echo "错误: 检测到 Clash Verge Rev 正在运行，请先完全退出"
+clash_kernel_pids() {
+    pgrep -i "$CLASH_KERNEL_PATTERN" 2>/dev/null
+}
+
+terminate_clash_processes() {
+    pkill -u "$(id -u)" -i "$CLASH_GUI_PATTERN" 2>/dev/null || true
+    pkill -u "$(id -u)" -i "$CLASH_GUI_PATTERN_SPACED" 2>/dev/null || true
+    pkill -i "$CLASH_KERNEL_PATTERN" 2>/dev/null || true
+    sleep 1
+    # 仍在的强杀
+    if [ -n "$(clash_gui_pids)" ] || [ -n "$(clash_kernel_pids)" ]; then
+        pkill -KILL -u "$(id -u)" -i "$CLASH_GUI_PATTERN" 2>/dev/null || true
+        pkill -KILL -u "$(id -u)" -i "$CLASH_GUI_PATTERN_SPACED" 2>/dev/null || true
+        pkill -KILL -i "$CLASH_KERNEL_PATTERN" 2>/dev/null || true
+        sleep 1
+    fi
+}
+
+if [ -n "$(clash_gui_pids)" ] || [ -n "$(clash_kernel_pids)" ]; then
+    echo ">>> 检测到 Clash Verge Rev 或内核仍在运行，正在尝试清退..."
+    terminate_clash_processes
+fi
+
+if [ -n "$(clash_gui_pids)" ]; then
+    echo "错误: Clash Verge Rev 仍在运行，安装器无法自动清退"
+    echo "请手动退出：点开 Clash Verge Rev 窗口，或用菜单栏图标里的「退出」"
+    echo "（直接关窗口只是最小化到菜单栏，进程仍在运行）"
     exit 1
 fi
+
+if [ -n "$(clash_kernel_pids)" ]; then
+    echo ">>> 提示: 内核仍在运行，且由管理员权限启动（服务模式），安装器无权结束它"
+    echo ">>> 这不影响安装，但请安装完成后重新打开 Clash Verge Rev，让新配置生效"
+    echo ">>> 若要立刻结束内核，可在 Clash Verge Rev 里关闭「服务模式」，或执行:"
+    echo ">>>   sudo pkill -x verge-mihomo"
+fi
+
+echo ">>> 已确认 Clash Verge Rev 与内核均已退出"
 
 mkdir -p "$CLASH_DIR/profiles"
 

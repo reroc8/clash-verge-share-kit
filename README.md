@@ -24,12 +24,14 @@
 
 ## 安装
 
-1. **准备** — 安装 Clash Verge Rev，导入自己的订阅，确认能代理后**完全退出**。
+1. **准备** — 安装 Clash Verge Rev，导入自己的订阅，确认能代理。**不用手动退出**：安装器会先帮你把还在运行的 Clash Verge Rev 关掉。
 2. **下载** — 从 [Release](https://github.com/reroc8/clash-verge-share-kit/releases/latest) 下载最新 zip 并解压。
 3. **安装** — 双击 `macOS点我安装.command`（Mac）或 `Windows点我安装.bat`（Win 10/11）。
 4. **完成** — 重新打开 Clash Verge Rev，按下方「安装后 60 秒检查清单」核对。
 
 安装前自动备份，不修改订阅和节点。自动备份只保留最近 **5 个**，手工备份不会被删。
+
+若 Clash Verge Rev 开着「服务模式」，内核由管理员权限启动，安装器无权结束它——这不影响安装，装完重新打开 Clash Verge Rev 让新配置生效即可。
 
 ## 备份还原
 

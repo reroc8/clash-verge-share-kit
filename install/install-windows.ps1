@@ -165,16 +165,67 @@ try {
         New-Item -ItemType Directory -Path $script:ProfilesDir -Force | Out-Null
     }
 
-    # Get-Process -Name supports wildcards: clash-verge* covers clash-verge and
-    # clash-verge-service, Clash Verge* covers the space-containing variant name,
-    # and verge-mihomo* covers the alpha kernel.
-    $runningNames = @('clash-verge*', 'Clash Verge*', 'verge-mihomo*', 'mihomo')
-    foreach ($name in $runningNames) {
-        if (Get-Process -Name $name -ErrorAction SilentlyContinue) {
-            Say-B64 '6ZSZ6K+vOiDmo4DmtYvliLAgQ2xhc2ggVmVyZ2UgUmV2IOaIluWGheaguOS7jeWcqOi/kOihjOOAguivt+WFiOWujOWFqOmAgOWHuuOAgg=='
-            exit 1
+    # Three kinds of process, handled differently:
+    #   GUI    clash-verge - rewrites verge.yaml on exit, so it must be stopped
+    #          before we replace files; if it survives, abort the install.
+    #   kernel verge-mihomo* / mihomo - only reads the config and never rewrites
+    #          the files we install. In service mode it runs as SYSTEM, so a
+    #          normal user cannot stop it: stop it if possible, otherwise warn
+    #          and continue.
+    #   helper clash-verge-service - a Windows service that keeps running after
+    #          Clash is closed and never rewrites the config, so it must not
+    #          block the install. Matching it was the old false positive:
+    #          'clash-verge*' also matched this helper, so any machine with
+    #          service mode on was reported as "still running" even after the
+    #          user had quit Clash. The exact name below does not match it.
+    $guiNames = @('clash-verge', 'Clash Verge*')
+    $kernelNames = @('verge-mihomo*', 'mihomo')
+
+    $runningGui = @(Get-Process -Name $guiNames -ErrorAction SilentlyContinue)
+    $runningKernel = @(Get-Process -Name $kernelNames -ErrorAction SilentlyContinue)
+
+    if ($runningGui.Count -gt 0 -or $runningKernel.Count -gt 0) {
+        Say-B64 '5qOA5rWL5YiwIENsYXNoIFZlcmdlIFJldiDmiJblhoXmoLjku43lnKjov5DooYzvvIzmraPlnKjlsJ3or5XmuIXpgIAuLi4='
+        foreach ($proc in ($runningGui + $runningKernel)) {
+            try {
+                Stop-Process -Id $proc.Id -Force -ErrorAction Stop
+            } catch {
+                $null = $_
+            }
+        }
+        Start-Sleep -Seconds 1
+        $runningGui = @(Get-Process -Name $guiNames -ErrorAction SilentlyContinue)
+        $runningKernel = @(Get-Process -Name $kernelNames -ErrorAction SilentlyContinue)
+    }
+
+    if ($runningGui.Count -gt 0) {
+        Say-B64 '6ZSZ6K+vOiBDbGFzaCBWZXJnZSBSZXYg5LuN5Zyo6L+Q6KGM77yM5a6J6KOF5Zmo5peg5rOV6Ieq5Yqo5riF6YCA44CC'
+        Say-B64 '6K+354K55byAIENsYXNoIFZlcmdlIFJldiDnqpflj6PvvIzmiJbnlKjmiZjnm5jlm77moIfoj5zljZXph4znmoTjgIzpgIDlh7rjgI3vvJvnm7TmjqXlhbPnqpflj6Plj6rmmK/mnIDlsI/ljJbliLDmiZjnm5jvvIzov5vnqIvku43lnKjov5DooYzjgII='
+        exit 1
+    }
+
+    if ($runningKernel.Count -gt 0) {
+        Say-B64 '5o+Q56S6OiDlhoXmoLjku43lnKjov5DooYzvvIzkuJTnlLHnrqHnkIblkZjmnYPpmZDlkK/liqjvvIjmnI3liqHmqKHlvI/vvInvvIzlronoo4Xlmajml6DmnYPnu5PmnZ/lroPjgILkuI3lvbHlk43lronoo4XvvIzkvYbor7flronoo4XlrozmiJDlkI7ph43mlrDmiZPlvIAgQ2xhc2ggVmVyZ2UgUmV2IOiuqeaWsOmFjee9rueUn+aViOOAgg=='
+    }
+
+    # Best-effort stop of the helper service. It needs admin rights and never
+    # rewrites the config, so a failure here is not fatal.
+    # Note the naming: the registered service is clash_verge_service (underscores,
+    # as used by the upstream NSIS installer), while the executable and therefore
+    # the process is clash-verge-service.exe (hyphens). Both spellings are tried
+    # so a future rename cannot silently turn this into a no-op.
+    foreach ($serviceName in @('clash_verge_service', 'clash-verge-service')) {
+        try {
+            $helperService = Get-Service -Name $serviceName -ErrorAction SilentlyContinue
+            if ($helperService -and $helperService.Status -eq 'Running') {
+                Stop-Service -Name $serviceName -Force -ErrorAction SilentlyContinue
+            }
+        } catch {
+            $null = $_
         }
     }
+
+    Say-B64 '5bey56Gu6K6kIENsYXNoIFZlcmdlIFJldiDkuI7lhoXmoLjlnYflt7LpgIDlh7o='
 
     $timestamp = Get-Date -Format 'yyyyMMdd_HHmmss'
     for ($i = 0; $i -lt 10; $i++) {
