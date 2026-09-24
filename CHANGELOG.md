@@ -1,7 +1,13 @@
 # Changelog
 
-## v0.3.32
+## v0.3.31
 
+- 修复「已经退出 Clash 却仍提示检测到 Clash Verge Rev 或内核仍在运行」：根因是安装器的检测用了宽松匹配 `pgrep -i "clash-verge"`，它会命中 `clash-verge-service` —— 那是 launchd 的常驻助手（`RunAtLoad` + `KeepAlive`），退出 Clash 后照常在跑，于是任何开了服务模式的机器都会被误判。现在 GUI 判定改为只认当前用户的进程（`pgrep -u "$(id -u)"`），常驻助手不再计入阻断条件；Windows 侧同理，原先的 `clash-verge*` 通配也会命中 `clash-verge-service.exe`，现改为精确名 `clash-verge`。
+- 新增「清退进程」：检测到 GUI 或内核仍在运行时，安装器先自动结束它们（先 `TERM`、等待、必要时 `KILL`），再继续安装，不再直接报错让用户自己处理。
+- 按进程性质区分阻断条件：GUI（会回写 `verge.yaml`）清退失败即中止安装；内核只读配置、服务模式下由管理员权限启动，普通用户无权结束，因此清退失败只提示不阻断；`clash-verge-service` 既不阻断也不再尝试结束（需管理员权限，且不改写配置）。Windows 侧顺带修正服务名：注册名是 `clash_verge_service`（下划线），可执行文件才是 `clash-verge-service.exe`（连字符），两个写法都尝试停止。
+- 安装器回归测试补三个场景：只跑 root 常驻助手时必须继续安装（本次修复的核心回归点）、GUI 可清退时必须自动清退后继续、GUI 清退失败时必须中止且不动任何文件。
+- 修复测试套件的安全隐患：安装器在检测到进程时会真的执行 `pkill`，而原先只有部分场景在 PATH 里放了替身——缺失时真实 `pkill` 会命中开发者本机正在使用的 Clash。现在每个场景都注入假 `pkill`（记录调用、按需模拟清退结果），并断言该调用时才调用。
+- README 安装步骤改为「不用手动退出」，并说明服务模式下内核需管理员权限、装完重开即可。
 - 新增可手动运行的「关闭进程」脚本，安装器关不掉时操作者有自己的出口：
   - `macOS关闭Clash.command`（仓库里是 `install/close-clash-macos.command`）；
   - `Windows关闭Clash.bat` + `close-clash-windows.ps1`（仓库里是 `install/` 下同名文件）。
@@ -11,15 +17,6 @@
 - 打包与门禁同步：新增文件进入 Release 包（`macOS关闭Clash.command` 带可执行位、中文名条目带 UTF-8 标志位）；纯 ASCII 门禁与 `bash -n` 覆盖新文件；CI 的 Windows 作业也把 `close-clash-windows.ps1` / `close-clash-windows.bat` 纳入纯 ASCII 检查。
 - 打包脚本的纯 ASCII 门禁改为列表驱动（`ASCII_ONLY_FILES`），以后新增同类文件只需加一行；Windows 侧 CRLF 转换同样改为列表驱动。
 - 安装器回归测试新增三个场景：无进程时关闭脚本应直接退出且不调用 `pkill`；GUI 在跑时应关掉并报告成功；安装器清退失败时提示里必须出现该脚本名。
-
-## v0.3.31
-
-- 修复「已经退出 Clash 却仍提示检测到 Clash Verge Rev 或内核仍在运行」：根因是安装器的检测用了宽松匹配 `pgrep -i "clash-verge"`，它会命中 `clash-verge-service` —— 那是 launchd 的常驻助手（`RunAtLoad` + `KeepAlive`），退出 Clash 后照常在跑，于是任何开了服务模式的机器都会被误判。现在 GUI 判定改为只认当前用户的进程（`pgrep -u "$(id -u)"`），常驻助手不再计入阻断条件；Windows 侧同理，原先的 `clash-verge*` 通配也会命中 `clash-verge-service.exe`，现改为精确名 `clash-verge`。
-- 新增「清退进程」：检测到 GUI 或内核仍在运行时，安装器先自动结束它们（先 `TERM`、等待、必要时 `KILL`），再继续安装，不再直接报错让用户自己处理。
-- 按进程性质区分阻断条件：GUI（会回写 `verge.yaml`）清退失败即中止安装；内核只读配置、服务模式下由管理员权限启动，普通用户无权结束，因此清退失败只提示不阻断；`clash-verge-service` 既不阻断也不再尝试结束（需管理员权限，且不改写配置）。Windows 侧顺带修正服务名：注册名是 `clash_verge_service`（下划线），可执行文件才是 `clash-verge-service.exe`（连字符），两个写法都尝试停止。
-- 安装器回归测试补三个场景：只跑 root 常驻助手时必须继续安装（本次修复的核心回归点）、GUI 可清退时必须自动清退后继续、GUI 清退失败时必须中止且不动任何文件。
-- 修复测试套件的安全隐患：安装器在检测到进程时会真的执行 `pkill`，而原先只有部分场景在 PATH 里放了替身——缺失时真实 `pkill` 会命中开发者本机正在使用的 Clash。现在每个场景都注入假 `pkill`（记录调用、按需模拟清退结果），并断言该调用时才调用。
-- README 安装步骤改为「不用手动退出」，并说明服务模式下内核需管理员权限、装完重开即可。
 
 ## v0.3.30
 
