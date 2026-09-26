@@ -27,7 +27,7 @@ mkdir -p "$LOGDIR"
 #   · 服务模式（装了「服务」，内核由系统服务启动）→ /var/run/clash-verge-service/users/<uid>/verge-mihomo.sock
 #   · 用户模式（Sidecar，没装服务）              → $TMPDIR/verge-mihomo.sock
 # 注意：clash-verge.yaml 里的 external-controller-unix 在服务模式下写的仍是用户模式地址，
-# 不代表当前真正在用的那个，所以这里一律按「文件是否存在」探测，不读配置文件。
+# 不代表当前真正在用的那个，所以这里一律自己探测，不读配置文件。
 SOCK_OVERRIDE="${CLASH_SOCK:-}"
 SOCK=""
 
@@ -41,6 +41,13 @@ sock_candidates() {
   printf '%s\n' "/tmp/verge/verge-mihomo.sock"
 }
 
+# 只判断文件存在不够：换过运行模式后，上一个模式留下的 socket 文件可能还在，
+# 选中它就会一直采样失败。所以再确认一下它真的能应答。
+# （上游服务同样是按「能不能连上」而不是「文件在不在」来判断的。）
+sock_alive() {
+  curl -s -m 2 -o /dev/null --unix-socket "$1" http://localhost/version
+}
+
 detect_sock() {
   if [ -n "$SOCK_OVERRIDE" ]; then
     SOCK="$SOCK_OVERRIDE"
@@ -48,7 +55,7 @@ detect_sock() {
   fi
   local cand
   while IFS= read -r cand; do
-    if [ -S "$cand" ]; then
+    if [ -S "$cand" ] && sock_alive "$cand"; then
       SOCK="$cand"
       return 0
     fi
