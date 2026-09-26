@@ -1,5 +1,13 @@
 # Changelog
 
+## v0.3.32
+
+- 修复 `scripts/clash-monitor.sh` 在 Clash Verge Rev 2.5.4 及之后版本上完全跑不起来：脚本写死的接口地址 `/tmp/verge/verge-mihomo.sock` 自 2.5.4 起已废弃（macOS 上服务模式改到 `/var/run/clash-verge-service/users/<uid>/verge-mihomo.sock`，用户模式改到 `$TMPDIR/verge-mihomo.sock`，且用户 ID 因机器而异）。现改为按「服务模式 → 用户模式 → 旧版位置」顺序探测，并在启动时打印实际命中的地址。
+- 探测不到接口时不再只是反复报「采样失败」：启动即列出已检查的全部位置，并提示用 `CLASH_SOCK=/路径` 手动指定；内核稍后启动会自动连上，采样中途失败（例如服务模式与用户模式之间切换）也会重新探测，不需要重启脚本。
+- 该脚本此前不在任何发版门禁的检查范围内，现补入 `bash -n` 语法校验列表。
+- `docs/routing.md` 同步修正：去掉写死的旧接口地址，写明两种运行模式的实际路径，并记录「`clash-verge.yaml` 里的 `external-controller-unix` 在服务模式下写的仍是用户模式地址、不能当作当前实际地址」这一坑。
+- 本版不含路由行为变更，只修监控工具与文档。
+
 ## v0.3.31
 
 - 修复「已经退出 Clash 却仍提示检测到 Clash Verge Rev 或内核仍在运行」：根因是安装器的检测用了宽松匹配 `pgrep -i "clash-verge"`，它会命中 `clash-verge-service` —— 那是 launchd 的常驻助手（`RunAtLoad` + `KeepAlive`），退出 Clash 后照常在跑，于是任何开了服务模式的机器都会被误判。现在 GUI 判定改为只认当前用户的进程（`pgrep -u "$(id -u)"`），常驻助手不再计入阻断条件；Windows 侧同理，原先的 `clash-verge*` 通配也会命中 `clash-verge-service.exe`，现改为精确名 `clash-verge`。

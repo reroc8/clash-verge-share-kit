@@ -8,17 +8,54 @@
 #   ./clash-monitor.sh 60              # 运行 60 秒后退出
 #   ./clash-monitor.sh 0 /tmp/out.log  # 无限运行，日志写 /tmp/out.log
 #
+# 接口地址：自动探测，也可用环境变量覆盖
+#   CLASH_SOCK=/path/to.sock ./clash-monitor.sh
+#
 # 输出:
 #   <脚本目录>/../monitor/clash-traffic.log   CSV: 时间,进程,上传增量MB,下载增量MB,连接数
 #   终端实时打印 Top 进程排行（每 30 秒刷新一次）
 # ─────────────────────────────────────────────────────────────
 set -euo pipefail
 
-SOCK="${CLASH_SOCK:-/tmp/verge/verge-mihomo.sock}"
 DURATION="${1:-0}"                      # 0 = 无限
 LOGDIR="$(cd "$(dirname "$0")/.." && pwd)/monitor"
 LOGFILE="${2:-$LOGDIR/clash-traffic.log}"
 mkdir -p "$LOGDIR"
+
+# ── 内核接口地址 ──────────────────────────────────────────────
+# Clash Verge Rev 2.5.4 起 macOS 上不再是固定的 /tmp/verge/verge-mihomo.sock：
+#   · 服务模式（装了「服务」，内核由系统服务启动）→ /var/run/clash-verge-service/users/<uid>/verge-mihomo.sock
+#   · 用户模式（Sidecar，没装服务）              → $TMPDIR/verge-mihomo.sock
+# 注意：clash-verge.yaml 里的 external-controller-unix 在服务模式下写的仍是用户模式地址，
+# 不代表当前真正在用的那个，所以这里一律按「文件是否存在」探测，不读配置文件。
+SOCK_OVERRIDE="${CLASH_SOCK:-}"
+SOCK=""
+
+sock_candidates() {
+  # 服务模式：路径里带当前用户 ID
+  printf '%s\n' "/var/run/clash-verge-service/users/$(id -u)/verge-mihomo.sock"
+  # 用户模式：macOS 的每用户临时目录（TMPDIR 末尾自带斜杠，去掉再拼）
+  local tmp="${TMPDIR:-/tmp}"
+  printf '%s\n' "${tmp%/}/verge-mihomo.sock"
+  # 2.5.4 之前的旧位置，保留用于兼容旧版内核
+  printf '%s\n' "/tmp/verge/verge-mihomo.sock"
+}
+
+detect_sock() {
+  if [ -n "$SOCK_OVERRIDE" ]; then
+    SOCK="$SOCK_OVERRIDE"
+    return 0
+  fi
+  local cand
+  while IFS= read -r cand; do
+    if [ -S "$cand" ]; then
+      SOCK="$cand"
+      return 0
+    fi
+  done < <(sock_candidates)
+  SOCK=""
+  return 1
+}
 
 # 进程级累计状态持久化在 /tmp/clash-mon-state.txt（由 Python 维护）
 # 每次启动重置状态：首轮只记基线不记增量，避免把连接累计总量当成增量
@@ -49,12 +86,24 @@ PYEOF
 if [ ! -s "$LOGFILE" ]; then
   echo "timestamp,process,upload_delta_mb,download_delta_mb,connections" > "$LOGFILE"
 fi
-echo "[监控启动] socket=$SOCK  日志=$LOGFILE  (Ctrl+C 停止)"
+if detect_sock; then
+  echo "[监控启动] socket=$SOCK  日志=$LOGFILE  (Ctrl+C 停止)"
+else
+  echo "[监控启动] 暂未找到内核接口，日志=$LOGFILE  (Ctrl+C 停止)"
+  echo "           已检查以下位置，内核起来后会自动重试：" >&2
+  sock_candidates | sed 's/^/             /' >&2
+  echo "           要手动指定：CLASH_SOCK=/路径 $0" >&2
+fi
 
 ITER=0
 LAST_REPORT=$(date +%s)
 while true; do
-  if sample; then
+  if [ -z "$SOCK" ]; then
+    if detect_sock; then
+      echo "[$(date '+%H:%M:%S')] 已连接到内核接口: $SOCK"
+    fi
+  fi
+  if [ -n "$SOCK" ] && sample; then
     TS=$(date '+%Y-%m-%d %H:%M:%S')
     # 计算每个进程相对上一轮的增量并累计
     python3 - "$TS" "$LOGFILE" <<'PYEOF'
@@ -102,7 +151,9 @@ if rows:
         print(f"  {k:<28} ↑{du:+8.2f}MB ↓{dd:+8.2f}MB  ({n}连接)")
 PYEOF
   else
-    echo "[$(date '+%H:%M:%S')] 采样失败（内核未运行或 socket 不可用）" >&2
+    # 内核可能还没起来，或者换了运行模式（服务 ↔ 用户），下一轮重新探测
+    [ -n "$SOCK_OVERRIDE" ] || SOCK=""
+    echo "[$(date '+%H:%M:%S')] 采样失败（内核未运行或接口地址已变），稍后重试" >&2
   fi
 
   ITER=$((ITER + 1))

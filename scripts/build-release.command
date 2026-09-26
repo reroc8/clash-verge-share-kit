@@ -108,6 +108,7 @@ bash -n "$ROOT_DIR/install/close-clash-macos.command"
 bash -n "$ROOT_DIR/macOS点我安装.command"
 bash -n "$ROOT_DIR/macOS关闭Clash.command"
 bash -n "$ROOT_DIR/scripts/check-sensitive.sh"
+bash -n "$ROOT_DIR/scripts/clash-monitor.sh"
 bash -n "$ROOT_DIR/tests/test-installers.sh"
 bash "$ROOT_DIR/tests/test-installers.sh"
 
