@@ -281,7 +281,12 @@ function groupByName(config, name) {
     "DOMAIN,notebooklm.googleapis.com,AI",
     "DOMAIN-SUFFIX,gemini.gstatic.com,AI",
     "DOMAIN-SUFFIX,generativeai.google,AI",
-    "DOMAIN-SUFFIX,tgalileo.com,Proxies"
+    "DOMAIN-SUFFIX,tgalileo.com,Proxies",
+    "DOMAIN-SUFFIX,lexmount.com,US",
+    "PROCESS-NAME-REGEX,(?i)^muse$,US",
+    "DOMAIN-SUFFIX,muse.meta.com,US",
+    "DOMAIN-SUFFIX,muse.ai,US",
+    "DOMAIN-SUFFIX,dola.com,SG"
   ];
   for (const rule of requiredBusinessRules) {
     assert(mergeSource.includes(`- ${rule}`), `${rule} must remain in Merge.yaml`);
@@ -307,6 +312,36 @@ function groupByName(config, name) {
     tgalileoIndex < applicationsIndex,
     "tgalileo rule must precede the generic application bypass layer"
   );
+
+  // 本轮新增的出口定向规则（lexmount / Meta Muse / muse.ai / Dola）。
+  // 位次是它们生效的前提：Muse 桌面版实际连的是 graph.facebook.com（在 global-domain 内），
+  // muse.ai 在 tld-proxy 内；lexmount.com 与 dola.com 不在任何规则集（会落到兜底 DIRECT）。
+  // 统一断言它们排在全部通用规则集之前。
+  const tldProxyIndex = mergeSource.indexOf("- RULE-SET,tld-proxy,Proxies");
+  assert(tldProxyIndex > 0, "tld-proxy rule must exist");
+  const directedExitRules = [
+    "- DOMAIN-SUFFIX,lexmount.com,US",
+    "- PROCESS-NAME-REGEX,(?i)^muse$,US",
+    "- DOMAIN-SUFFIX,muse.meta.com,US",
+    "- DOMAIN-SUFFIX,muse.ai,US",
+    "- DOMAIN-SUFFIX,dola.com,SG"
+  ];
+  for (const directedRule of directedExitRules) {
+    const directedIndex = mergeSource.indexOf(directedRule);
+    assert(directedIndex > 0, `${directedRule} must exist in Merge.yaml`);
+    assert(
+      directedIndex < globalDomainIndex,
+      `${directedRule} must precede global-domain, otherwise it loses to the generic proxy layer`
+    );
+    assert(
+      directedIndex < tldProxyIndex,
+      `${directedRule} must precede tld-proxy, otherwise it loses to the generic proxy layer`
+    );
+    assert(
+      directedIndex < cnDomainIndex,
+      `${directedRule} must precede cn-domain, otherwise the domestic layer may claim it`
+    );
+  }
   for (const domain of ["t.me", "telegra.ph", "telegram-cdn.org", "telegram.org", "telesco.pe"]) {
     assert(
       mergeSource.includes(`- DOMAIN-SUFFIX,${domain},Telegram`),

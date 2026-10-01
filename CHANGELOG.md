@@ -1,5 +1,15 @@
 # Changelog
 
+## v0.3.33
+
+- 新增三条地区受限服务的出口定向规则（都置于通用规则集之前）：
+  - `DOMAIN-SUFFIX,lexmount.com,US` —— Lexmount（AI Agent 云浏览器）需海外出口，且该域不在任何规则集内，原会落到兜底 `DIRECT`。
+  - `PROCESS-NAME-REGEX,(?i)^muse$,US`、`DOMAIN-SUFFIX,muse.meta.com,US`、`DOMAIN-SUFFIX,muse.ai,US` —— Meta Muse（个人 AI 代理，2026-09 起仅北美开放）。Muse 桌面版实际连的是 `graph.facebook.com` 等 Meta 域名（在 `global-domain` 规则集内），按域名无法与服务区分，故用进程名匹配；网页版入口与同名产品 `muse.ai` 一并定向。
+  - `DOMAIN-SUFFIX,dola.com,SG` —— Dola（字节豆包海外版）区域锁定：美国、加拿大、澳大利亚、中国大陆均不可用，主力市场为东南亚与英国，因此走 `SG` 而非 `US`。
+- `tests/test-script.js` 为这五条规则补位次断言：必须早于 `global-domain`、`tld-proxy`、`cn-domain`——Muse 的进程规则若晚于 `global-domain`，`graph.facebook.com` 会先被判给 `Proxies`；`muse.ai` 同理会被 `tld-proxy` 抢走。
+- `README.md` 效果表补 `Lexmount / Meta Muse`（`US`）与 `Dola`（`SG`）两行；`docs/routing.md` 新增「地区受限服务的出口定向」章节，记录各服务的地区要求与位次前提。
+- 本版不含路由结构变更：仅新增精确规则与文档，既有规则与组结构不变。
+
 ## v0.3.32
 
 - 修复 `scripts/clash-monitor.sh` 在 Clash Verge Rev 2.5.4 及之后版本上完全跑不起来：脚本写死的接口地址 `/tmp/verge/verge-mihomo.sock` 自 2.5.4 起已废弃（macOS 上服务模式改到 `/var/run/clash-verge-service/users/<uid>/verge-mihomo.sock`，用户模式改到 `$TMPDIR/verge-mihomo.sock`，且用户 ID 因机器而异）。现改为按「服务模式 → 用户模式 → 旧版位置」顺序探测，并在启动时打印实际命中的地址。

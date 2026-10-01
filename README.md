@@ -17,6 +17,8 @@
 | DeepSeek / Kimi / 豆包 / 通义 等大陆 AI | 🏠 直连 |
 | Google / YouTube / Telegram | 🌐 各自独立分组 |
 | OKX / Bybit / Binance 等交易所 | 💱 `Exchange`，锁定 TW · SG |
+| Lexmount（AI 云浏览器）· Meta Muse | 🇺🇸 走 `US`（Muse 仅北美开放） |
+| Dola（豆包海外版） | 🇸🇬 走 `SG`（美/加/澳/中国大陆不可用） |
 | 国内网站 · 局域网 | 🏠 直连 |
 | 其他海外网站 | 🚀 `Proxies` |
 

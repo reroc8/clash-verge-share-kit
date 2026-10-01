@@ -103,6 +103,18 @@ rules:
   # 换来的是 ISP 侧看不到该 SNI，以及海外端点走代理链路的质量。
   # 国内版遥测走 galileotelemetry.tencent.com（命中 cn-domain 的 +.tencent.com），不受影响。
   - DOMAIN-SUFFIX,tgalileo.com,Proxies
+  # Lexmount（AI Agent 云浏览器，browser.lexmount.com）：云浏览器服务需海外出口，
+  # 该域不在任何规则集内，默认会落到兜底 DIRECT，故前置精确规则。
+  - DOMAIN-SUFFIX,lexmount.com,US
+  # Meta Muse（个人 AI 代理，2026-09 起仅北美开放）与 muse.ai：需美区出口。
+  # Muse 桌面版实际连的是 graph.facebook.com 等 Meta 域名（走 global-domain 规则集），
+  # 按域名无法与服务区分，故用进程名匹配；muse.meta.com 为网页版入口。
+  - PROCESS-NAME-REGEX,(?i)^muse$,US
+  - DOMAIN-SUFFIX,muse.meta.com,US
+  - DOMAIN-SUFFIX,muse.ai,US
+  # Dola（字节豆包海外版，dola.com）：区域锁定，US / CA / AU / 中国大陆均不可用，
+  # 主力市场为东南亚与英国。用 SG 地区组，禁用 US 组。
+  - DOMAIN-SUFFIX,dola.com,SG
   # Google account / auth / billing stay on the stable Google group
   - DOMAIN,accounts.google.com,Google
   - DOMAIN,myaccount.google.com,Google

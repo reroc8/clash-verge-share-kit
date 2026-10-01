@@ -67,8 +67,37 @@ WorkBuddy AI 国际版的遥测端点 `sg.tgalileo.com` 解析到腾讯云新加
 
 取舍：该规则把遥测 SNI 从「对 ISP 可见」变为「对代理节点可见」，并非消除可见性；换来的是 ISP 侧看不到该 SNI，以及海外端点走代理链路的质量。另外目标组 `Proxies` 是可手动选择、且选项里含 `DIRECT` 的通用组，是否真的走代理取决于用户当前选择（`DIRECT` 排在最后，默认第一项是真节点，实际会走代理）。国内版遥测 `galileotelemetry.tencent.com` 命中 `cn-domain` 的 `+.tencent.com`，继续直连。
 
-兼容策略：
+地区受限服务的出口定向：
 
+有三个服务对出口地区有硬性要求，各加了精确规则（都排在通用规则集之前）：
+
+- **Lexmount**（AI Agent 云浏览器，`browser.lexmount.com`）：云浏览器服务需海外出口；该域不在任何规则集内，默认会落到兜底 `DIRECT`。
+
+```yaml
+- DOMAIN-SUFFIX,lexmount.com,US
+```
+
+- **Meta Muse**（个人 AI 代理，2026-09 起仅北美开放）与 **muse.ai**：需美区出口。Muse 桌面版实际连的是 `graph.facebook.com` 等 Meta 域名（在 `global-domain` 规则集内），按域名无法与服务区分，故用进程名匹配；网页版入口 `muse.meta.com` 另加域名规则。`muse.ai` 是同名的另一个产品（视频 AI 平台），一并定向。
+
+```yaml
+- PROCESS-NAME-REGEX,(?i)^muse$,US
+- DOMAIN-SUFFIX,muse.meta.com,US
+- DOMAIN-SUFFIX,muse.ai,US
+```
+
+- **Dola**（字节豆包海外版，`dola.com`）：**区域锁定——美国、加拿大、澳大利亚、中国大陆均不可用**，主力市场为东南亚与英国。
+
+```yaml
+- DOMAIN-SUFFIX,dola.com,SG
+```
+
+  注意这里用 `SG` 而不是 `US`：Dola 明确屏蔽美国 IP，走 `US` 反而不可用。
+
+位次要求：以上规则必须排在 `global-domain`、`tld-proxy`、`cn-domain` 之前。Muse 的进程规则若落到 `global-domain` 之后，`graph.facebook.com` 会先被判给 `Proxies`（默认台湾出口，Muse 不可用）；`muse.ai` 同理会被 `tld-proxy` 抢走。`tests/test-script.js` 对这五条规则都有位次断言。
+
+取舍：这些是**把某个服务固定到某地区组**，组内节点仍由用户选择。若订阅里没有对应地区的节点，`Script.js` 生成的组会自动过滤，最差回落到 `Proxies`——那时该服务的地区要求可能不满足，属于数据前提不足，不是规则失效。
+
+兼容策略：
 - 安装脚本不再要求订阅必须有固定策略组名。
 - 安装脚本会同步 `profiles.yaml` 中已有订阅绑定的 merge/script 文件，避免当前订阅继续使用旧脚本。
 - `Script.js` 会自动补齐 `Proxies / Claude / AI / US / Google / YouTube / Telegram / Exchange`；如果已有大小写不同的同名组，会复用已有组名并改写规则目标。
