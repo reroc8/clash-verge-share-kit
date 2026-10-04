@@ -283,7 +283,7 @@ function groupByName(config, name) {
     "DOMAIN-SUFFIX,generativeai.google,AI",
     "DOMAIN-SUFFIX,tgalileo.com,Proxies",
     "DOMAIN-SUFFIX,lexmount.com,US",
-    "PROCESS-NAME-REGEX,(?i)^muse$,US",
+    "PROCESS-NAME-REGEX,(?i)^muse,US",
     "DOMAIN-SUFFIX,muse.meta.com,US",
     "DOMAIN-SUFFIX,muse.ai,US",
     "DOMAIN-SUFFIX,dola.com,SG"
@@ -321,7 +321,7 @@ function groupByName(config, name) {
   assert(tldProxyIndex > 0, "tld-proxy rule must exist");
   const directedExitRules = [
     "- DOMAIN-SUFFIX,lexmount.com,US",
-    "- PROCESS-NAME-REGEX,(?i)^muse$,US",
+    "- PROCESS-NAME-REGEX,(?i)^muse,US",
     "- DOMAIN-SUFFIX,muse.meta.com,US",
     "- DOMAIN-SUFFIX,muse.ai,US",
     "- DOMAIN-SUFFIX,dola.com,SG"

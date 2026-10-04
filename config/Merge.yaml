@@ -108,8 +108,9 @@ rules:
   - DOMAIN-SUFFIX,lexmount.com,US
   # Meta Muse（个人 AI 代理，2026-09 起仅北美开放）与 muse.ai：需美区出口。
   # Muse 桌面版实际连的是 graph.facebook.com 等 Meta 域名（走 global-domain 规则集），
-  # 按域名无法与服务区分，故用进程名匹配；muse.meta.com 为网页版入口。
-  - PROCESS-NAME-REGEX,(?i)^muse$,US
+  # 按域名无法与服务区分，故用进程名匹配（前缀匹配，以覆盖可能存在的 helper 子进程）；
+  # muse.meta.com 为网页版入口。
+  - PROCESS-NAME-REGEX,(?i)^muse,US
   - DOMAIN-SUFFIX,muse.meta.com,US
   - DOMAIN-SUFFIX,muse.ai,US
   # Dola（字节豆包海外版，dola.com）：区域锁定，US / CA / AU / 中国大陆均不可用，
