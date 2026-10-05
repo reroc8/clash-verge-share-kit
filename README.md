@@ -49,7 +49,7 @@
 
 重新打开后，按顺序核对：
 
-1. 代理页能看到 `Claude / AI / Google / YouTube / Telegram / Exchange` 与 `US / TW / SG / HK / JP / Proxies` 这些策略组。
+1. 代理页能看到 `Claude / AI / Google / YouTube / Telegram / Exchange` 与 `US / TW / SG / HK / JP / UK / Proxies` 这些策略组。
 2. 打开 `claude.ai` 和 `chatgpt.com`，页面正常。
 3. 打开 `youtube.com`，视频能播放。
 4. 打开 `baidu.com`，国内网站直连正常。

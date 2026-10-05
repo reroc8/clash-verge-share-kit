@@ -1,5 +1,12 @@
 # Changelog
 
+## v0.3.34
+
+- 地区组新增 `UK`（英国）：`Script.js` 的地区识别与组列表原本只有 `HK / JP / SG / TW / US`。UK 的识别覆盖 emoji（🇬🇧）、英文全名（United Kingdom / Britain / England / London）与缩写（`UK`，带词边界避免误匹配其它词），代理页地区组顺序变为 `US / TW / SG / HK / JP / UK`。
+- 用途：区域锁定产品需要英国出口时（例如 Dola 官方支持的是 UK 与东南亚，而非美国），可以直接选 `UK` 组，不必依赖订阅自带的英国节点恰好被归入 `Proxies`。
+- `tests/test-script.js` 新增 UK 识别用例：emoji、全名、缩写三种命名都应归入 `UK` 组，`HK` 节点不串味，且 `HK` 组仍正常生成。已验证把 `UK` 从 `regionOrder` 移除后该断言会失败。
+- `README.md` 与 `docs/routing.md` 的组列表同步加上 `UK`。
+
 ## v0.3.33
 
 - 新增三条地区受限服务的出口定向规则（都置于通用规则集之前）：

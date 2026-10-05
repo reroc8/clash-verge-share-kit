@@ -107,6 +107,24 @@ function groupByName(config, name) {
   assert.strictEqual(output["rule-providers"].test.proxy, "Proxies Group");
 }
 
+// UK 地区识别（本轮新增地区组）：emoji、英文全名、缩写都应命中，且不与其他地区串味
+{
+  const output = run({
+    proxies: [{ name: "🇬🇧 London-01" }, { name: "United Kingdom-A" }, { name: "UK-B" }, { name: "HK-A" }],
+    "proxy-groups": [],
+    rules: ["MATCH,DIRECT"]
+  });
+
+  const ukGroup = groupByName(output, "UK");
+  assert(ukGroup, "UK region group must be generated when UK nodes are present");
+  assert.deepStrictEqual(
+    ukGroup.proxies.slice().sort(),
+    ["UK-B", "United Kingdom-A", "🇬🇧 London-01"].sort()
+  );
+  assert(!ukGroup.proxies.includes("HK-A"), "HK node must not leak into the UK group");
+  assert(groupByName(output, "HK"), "HK group must still be generated alongside UK");
+}
+
 {
   // rule-provider.proxy 的大小写变体必须与规则目标同一套 lookupName 语义改写：
   // 订阅组名为小写 proxies（被沿用），provider 写 PROXIES 不能悬空

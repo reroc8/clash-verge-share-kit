@@ -15,7 +15,7 @@
 代理页显示顺序固定为：
 
 ```text
-Claude / AI / Google / YouTube / Telegram / Exchange / US / TW / SG / HK / JP / Proxies
+Claude / AI / Google / YouTube / Telegram / Exchange / US / TW / SG / HK / JP / UK / Proxies
 ```
 
 前 6 个是业务组，中间 5 个是地区节点池，最后 `Proxies` 是普通代理兜底。
@@ -109,6 +109,6 @@ WorkBuddy AI 国际版的遥测端点 `sg.tgalileo.com` 解析到腾讯云新加
 - `Claude` 组会被强制更新为仅包含 `US`，用于降低 Claude 出口地区变化。
 - `AI` 组会被强制更新为仅包含 `US / TW`，用于降低国际 AI 服务出口地区变化；中国大陆 AI 不进入该组。
 - `Exchange` 组会被强制更新为仅包含 `TW / SG`，用于降低交易所登录出口地区变化。
-- 能识别地区节点时，自动生成 `HK / JP / SG / TW / US`。
+- 能识别地区节点时，自动生成 `HK / JP / SG / TW / US / UK`。
 - 代理页核心组会重新排序为业务组、地区组、普通代理兜底，不保留订阅原始组的混排顺序。
 - 识别不到地区时，降级到 `Proxies` 或 `DIRECT`，优先保证配置能启动。

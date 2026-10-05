@@ -427,7 +427,8 @@ function main(config, profileName) {
     JP: [/日本/i, /Japan/i, /Tokyo/i, /Osaka/i, /(^|[^A-Za-z])JP([^A-Za-z]|$)/i, /🇯🇵/],
     SG: [/新加坡/i, /Singapore/i, /(^|[^A-Za-z])SG([^A-Za-z]|$)/i, /🇸🇬/],
     TW: [/台湾/i, /台灣/i, /臺灣/i, /Taiwan/i, /(^|[^A-Za-z])TW([^A-Za-z]|$)/i, /🇹🇼/],
-    US: [/美国/i, /美國/i, /United States/i, /(^|[^A-Za-z])US([^A-Za-z]|$)/i, /(^|[^A-Za-z])USA([^A-Za-z]|$)/i, /🇺🇸/]
+    US: [/美国/i, /美國/i, /United States/i, /(^|[^A-Za-z])US([^A-Za-z]|$)/i, /(^|[^A-Za-z])USA([^A-Za-z]|$)/i, /🇺🇸/],
+    UK: [/英国/i, /英國/i, /United Kingdom/i, /Britain/i, /England/i, /London/i, /(^|[^A-Za-z])UK([^A-Za-z]|$)/i, /🇬🇧/]
   };
 
   var managedGroups = {
@@ -435,7 +436,7 @@ function main(config, profileName) {
   };
   var detectedRegions = createNameMap();
 
-  var regionOrder = ["HK", "JP", "SG", "TW", "US"];
+  var regionOrder = ["HK", "JP", "SG", "TW", "US", "UK"];
   for (var ro = 0; ro < regionOrder.length; ro++) {
     var region = regionOrder[ro];
     var regionOptions = [];
@@ -536,6 +537,7 @@ function main(config, profileName) {
     managedGroups.SG,
     managedGroups.HK,
     managedGroups.JP,
+    managedGroups.UK,
     PROXIES_GROUP
   ];
   var orderedGroups = [];
