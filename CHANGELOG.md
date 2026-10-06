@@ -1,5 +1,23 @@
 # Changelog
 
+## v0.3.35
+
+- **剔除「提示类节点」**。机场常把「剩余流量 / 套餐到期 / 官网」这类提示做成节点塞进列表，
+  名字还随订阅更新变化。选到它们会静默出问题：看着像在用某个落地，实际出口 IP 会漂到别处，
+  表现是 X 掉登录、Discord 反复跳认证、AI 服务被风控。
+  现在在 Script.js 收集阶段就把它们从 `proxies` 里删掉（**真的删，不只是不建组** ——
+  只不建组的话它们仍会出现在客户端节点列表里，用户照样能选到），并打日志告诉你剔除了几个。
+  触发词：导航 / 剩余 / 流量 / 套餐 / 到期 / 过期 / 重置 / 续费 / 试用 / 官网 / 订阅 / 购买 /
+  客服 / 机场 / 群组 / 频道 / 回国 / 回程 / 国内专线 / traffic / expire / website。
+- **地区识别补城市名与机场缩写**。原来只认国名缩写和旗帜，节点叫「Los Angeles 01」而机场没插
+  emoji 时会漏掉。现在 US 认 Los Angeles / San Jose / Seattle / Chicago / New York / Dallas /
+  Phoenix / Silicon Valley（中英文都认），HK 认深港 / 沪港 / 京港 / 广港，JP 认东京 / 大阪 / 沪日，
+  SG 认狮城，TW 认 Taipei / 台北 / 新北 / 台中，UK 认伦敦。
+  刻意不写单字（如「美」「港」）—— 会误匹配到无关的词。
+- 以上两条来自调研仍在维护的同类规则项目（LingJingMaster/Shadowrocket-Rules、
+  IvanSolis1989/Smart-Config-Kit），做法与手机端 `mobile-proxy-share-kit` v0.2.5 对齐。
+- `tests/test-script.js` 增加两组用例：城市名/缩写归类、提示类节点被剔除且不误伤正常节点。
+
 ## v0.3.34
 
 - 地区组新增 `UK`（英国）：`Script.js` 的地区识别与组列表原本只有 `HK / JP / SG / TW / US`。UK 的识别覆盖 emoji（🇬🇧）、英文全名（United Kingdom / Britain / England / London）与缩写（`UK`，带词边界避免误匹配其它词），代理页地区组顺序变为 `US / TW / SG / HK / JP / UK`。

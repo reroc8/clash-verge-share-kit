@@ -247,9 +247,36 @@ function main(config, profileName) {
     originalGroups.push(groups[g].name);
   }
 
+  // 机场常把「剩余流量 / 套餐到期 / 官网」这类提示做成节点塞进列表，而且名字随订阅更新变化。
+  // 选到它们会静默出问题：看着像在用某个落地，实际出口 IP 会漂到别处，
+  // 表现是 X 掉登录、Discord 反复跳认证、AI 服务被风控。
+  // 所以在收集阶段就排除，不让它们进任何策略组。
+  var infoNodePatterns = [
+    /导航/, /剩余/, /流量/, /套餐/, /到期/, /过期/, /重置/, /续费/, /试用/,
+    /官网/, /订阅/, /购买/, /客服/, /机场/, /群组/, /频道/, /回国/, /回程/, /国内专线/,
+    /(^|[^A-Za-z])traffic([^A-Za-z]|$)/i,
+    /(^|[^A-Za-z])expire/i,
+    /(^|[^A-Za-z])website([^A-Za-z]|$)/i
+  ];
+
   var originalProxies = [];
+  var skippedInfoNodes = [];
   for (var pr = 0; pr < proxies.length; pr++) {
-    originalProxies.push(proxies[pr].name);
+    var candidateName = proxies[pr].name;
+    if (optionMatches(candidateName, infoNodePatterns)) {
+      skippedInfoNodes.push(candidateName);
+      continue;
+    }
+    originalProxies.push(candidateName);
+  }
+  if (skippedInfoNodes.length > 0) {
+    // 必须真的从配置里删掉，不能只是"不建组" —— 那样它们仍会出现在客户端的节点列表里，
+    // 用户照样能选到，问题一点没解决。（这个坑踩过：日志说跳过了，实际一个没少。）
+    config.proxies = proxies.filter(function (proxy) {
+      return !optionMatches(proxy.name, infoNodePatterns);
+    });
+    console.log("[clash-verge-share-kit] 已剔除 " + skippedInfoNodes.length +
+      " 个提示类节点（不是真实落地，选中会导致出口漂移）: " + skippedInfoNodes.join(" / "));
   }
   var proxyProviders = config["proxy-providers"];
   var hasProxyProviders = false;
@@ -422,13 +449,21 @@ function main(config, profileName) {
     PROXIES_GROUP = ensureManagedGroup("Proxies", generalOptions, ["DIRECT"]);
   }
 
+  // 地区识别。除了国名缩写，还要覆盖两类容易被漏掉的写法：
+  //   1. 只有城市名、不带国名也不带旗帜的节点，如「Los Angeles 01」「大阪 02」
+  //   2. 机场自己造的缩写，如「沪美」「深港」「沪日」
+  // 参考同类规则项目（LingJingMaster/Shadowrocket-Rules、IvanSolis1989/Smart-Config-Kit）。
+  // 刻意**不写单字**（如「美」「港」）—— 会误匹配到无关的词。
   var regionPatterns = {
-    HK: [/香港/i, /Hong Kong/i, /(^|[^A-Za-z])HK([^A-Za-z]|$)/i, /🇭🇰/],
-    JP: [/日本/i, /Japan/i, /Tokyo/i, /Osaka/i, /(^|[^A-Za-z])JP([^A-Za-z]|$)/i, /🇯🇵/],
-    SG: [/新加坡/i, /Singapore/i, /(^|[^A-Za-z])SG([^A-Za-z]|$)/i, /🇸🇬/],
-    TW: [/台湾/i, /台灣/i, /臺灣/i, /Taiwan/i, /(^|[^A-Za-z])TW([^A-Za-z]|$)/i, /🇹🇼/],
-    US: [/美国/i, /美國/i, /United States/i, /(^|[^A-Za-z])US([^A-Za-z]|$)/i, /(^|[^A-Za-z])USA([^A-Za-z]|$)/i, /🇺🇸/],
-    UK: [/英国/i, /英國/i, /United Kingdom/i, /Britain/i, /England/i, /London/i, /(^|[^A-Za-z])UK([^A-Za-z]|$)/i, /🇬🇧/]
+    HK: [/香港/i, /Hong Kong/i, /(^|[^A-Za-z])HK([^A-Za-z]|$)/i, /🇭🇰/, /深港/, /沪港/, /京港/, /广港/],
+    JP: [/日本/i, /Japan/i, /Tokyo/i, /Osaka/i, /(^|[^A-Za-z])JP([^A-Za-z]|$)/i, /🇯🇵/, /东京/i, /大阪/i, /沪日/],
+    SG: [/新加坡/i, /Singapore/i, /(^|[^A-Za-z])SG([^A-Za-z]|$)/i, /🇸🇬/, /狮城/],
+    TW: [/台湾/i, /台灣/i, /臺灣/i, /Taiwan/i, /(^|[^A-Za-z])TW([^A-Za-z]|$)/i, /🇹🇼/,
+         /Taipei/i, /台北/i, /新北/i, /台中/i],
+    US: [/美国/i, /美國/i, /United States/i, /(^|[^A-Za-z])US([^A-Za-z]|$)/i, /(^|[^A-Za-z])USA([^A-Za-z]|$)/i, /🇺🇸/,
+         /Los Angeles/i, /San Jose/i, /Seattle/i, /Chicago/i, /New York/i, /Dallas/i, /Phoenix/i, /Silicon Valley/i,
+         /洛杉矶/i, /圣何塞/i, /西雅图/i, /芝加哥/i, /纽约/i, /达拉斯/i, /凤凰城/i, /硅谷/i, /沪美/],
+    UK: [/英国/i, /英國/i, /United Kingdom/i, /Britain/i, /England/i, /London/i, /(^|[^A-Za-z])UK([^A-Za-z]|$)/i, /🇬🇧/, /伦敦/i]
   };
 
   var managedGroups = {

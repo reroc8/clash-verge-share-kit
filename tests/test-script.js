@@ -611,4 +611,61 @@ if (process.env.MIHOMO_BIN) {
   console.log(`Mihomo configuration tests passed: ${mihomoCases.length}`);
 }
 
+
+{
+  // 只有城市名、不带国名也不带旗帜的节点，必须也能归到正确地区。
+  // 机场这么命名很常见，早先的正则只认国名缩写，会漏掉。
+  const output = run({
+    proxies: [
+      { name: "Los Angeles 01" },
+      { name: "大阪 02" },
+      { name: "深港 03" },
+      { name: "狮城 04" },
+      { name: "台北 05" },
+      { name: "伦敦 06" }
+    ],
+    "proxy-groups": [],
+    rules: ["MATCH,DIRECT"]
+  });
+
+  assert.deepStrictEqual(groupByName(output, "US").proxies, ["Los Angeles 01"], "城市名要能识别成美国");
+  assert.deepStrictEqual(groupByName(output, "JP").proxies, ["大阪 02"], "城市名要能识别成日本");
+  assert.deepStrictEqual(groupByName(output, "HK").proxies, ["深港 03"], "机场缩写要能识别成香港");
+  assert.deepStrictEqual(groupByName(output, "SG").proxies, ["狮城 04"], "「狮城」要能识别成新加坡");
+  assert.deepStrictEqual(groupByName(output, "TW").proxies, ["台北 05"], "城市名要能识别成台湾");
+  assert.deepStrictEqual(groupByName(output, "UK").proxies, ["伦敦 06"], "城市名要能识别成英国");
+}
+
+{
+  // 提示类节点（剩余流量 / 套餐到期 / 官网…）必须被排除，不进任何组。
+  // 它们的名字随订阅更新变化，选中会让出口 IP 漂到别处 —— 表现为 X 掉登录、
+  // Discord 反复跳认证、AI 服务被风控，而且看不出是节点的问题。
+  const output = run({
+    proxies: [
+      { name: "剩余流量：16.1 GB" },
+      { name: "套餐到期：2026-09-10" },
+      { name: "官网 example.com" },
+      { name: "Traffic: 147.97 GB / 400 GB" },
+      { name: "🇺🇸 US-A" }
+    ],
+    "proxy-groups": [],
+    rules: ["MATCH,DIRECT"]
+  });
+
+  assert.deepStrictEqual(
+    output.proxies.map((proxy) => proxy.name),
+    ["🇺🇸 US-A"],
+    "提示类节点不该出现在最终配置里"
+  );
+  assert.deepStrictEqual(groupByName(output, "US").proxies, ["🇺🇸 US-A"]);
+
+  // 反过来：正常节点不能被误伤
+  const keep = run({
+    proxies: [{ name: "香港 01" }, { name: "US 直连备用" }],
+    "proxy-groups": [],
+    rules: ["MATCH,DIRECT"]
+  });
+  assert.deepStrictEqual(keep.proxies.map((proxy) => proxy.name), ["香港 01", "US 直连备用"]);
+}
+
 console.log("Script.js regression tests passed");
