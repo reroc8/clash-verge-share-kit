@@ -7,6 +7,18 @@
 - `Claude`：Claude / Anthropic 独立组，只保留 `US`。
 - `AI`：OpenAI、Gemini、Copilot、Cursor、Perplexity 等国际 AI 服务，只保留 `US / TW` 两个地区组；默认优先 US。OpenAI 专用静态与状态域名一并进入该组，减少同一会话落入普通 `Proxies` 的出口拆分。
 - `Google`：Google 账号、登录、OAuth、支付入口和 Google 生态。
+- 业务组统一遵循「**地区优先**」：`Claude` / `AI` / `Google` / `YouTube` / `Telegram` / `Exchange` 的**第一个选项都是明确的地区组**，`Proxies`（兜底组）降到选项列表末尾。这样每个组的默认行为都能一句话说清：
+
+| 组 | 默认首选 | 理由 |
+|---|---|---|
+| `Claude` | `US` | 美区，风控要求 |
+| `AI` | `US` | 美区优先，台湾备用 |
+| `Google` | `TW` | 就近 |
+| `YouTube` | `TW` | 就近 |
+| `Telegram` | `TW` | 就近 |
+| `Exchange` | `TW` | 台 / 新 |
+
+  早先 `Google` / `YouTube` / `Telegram` 把 `Proxies` 放在首位，默认行为因此是「跟随 `Proxies` 当前选中的节点」——分组形同虚设，此时观察到的出口地区只是 `Proxies` 恰好选到某地区的巧合，换掉 `Proxies` 的节点该服务的地区就跟着变。`Proxies` 仍保留在这几个组的选项里（排在后面），需要「跟随全局」时依旧可选。
 - `YouTube`：`youtube.com`、`youtu.be`、`youtube-nocookie.com`、`youtubeeducation.com`、`youtubegaming.com`、`youtubekids.com`、`googlevideo.com`、`ytimg.com`、`youtubei.googleapis.com`、`yt3.ggpht.com` 等视频、图片、嵌入播放器和儿童/教育子产品域名。
 - `Exchange`：OKX、Bybit、Binance、Bitget、Gate、KuCoin、MEXC、Crypto.com、Coinbase、Kraken、HTX、BingX、BitMart、Bitfinex、Bitstamp、Upbit 等交易所主域名、静态资源域名和 HTTPDNS 辅助域名。
 - `DIRECT`：局域网、国内 IP、钉钉（含进程级兜底，见下）、常规 Apple/iCloud、DeepSeek、Kimi、豆包、通义、文心、腾讯元宝、智谱、MiniMax 等中国大陆 AI。

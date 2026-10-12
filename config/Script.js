@@ -504,6 +504,10 @@ function main(config, profileName) {
   if (!managedGroups.US) {
     managedGroups.US = ensureManagedGroup("US", [PROXIES_GROUP, "DIRECT"], ["DIRECT"]);
   }
+  // 业务组统一采用「地区优先」：第一个选项是明确的地区组，Proxies（兜底组）降到最后。
+  // 这样每组的默认行为都能一句话说清（Claude→US、AI→US、Google/YouTube/Telegram→TW），
+  // 而不是「跟随 Proxies 当前选中的节点」——后者会让分组默认行为不可预期，
+  // 用户看到 Google 组也无法判断它实际走哪个地区。
   managedGroups.Claude = ensureManagedGroup("Claude", [
     detectedRegions.US ? managedGroups.US : null
   ], ["REJECT"]);
@@ -511,9 +515,9 @@ function main(config, profileName) {
     detectedRegions.US ? managedGroups.US : null,
     detectedRegions.TW ? managedGroups.TW : null
   ], ["REJECT"]);
-  managedGroups.Google = ensureManagedGroup("Google", [PROXIES_GROUP, managedGroups.US, managedGroups.HK, managedGroups.JP, managedGroups.SG, managedGroups.TW, "DIRECT"], ["DIRECT"]);
-  managedGroups.YouTube = ensureManagedGroup("YouTube", [PROXIES_GROUP, managedGroups.HK, managedGroups.JP, managedGroups.SG, managedGroups.TW, managedGroups.US, "DIRECT"], ["DIRECT"]);
-  managedGroups.Telegram = ensureManagedGroup("Telegram", [PROXIES_GROUP, managedGroups.HK, managedGroups.JP, managedGroups.SG, managedGroups.TW, managedGroups.US], [PROXIES_GROUP]);
+  managedGroups.Google = ensureManagedGroup("Google", [managedGroups.TW, managedGroups.US, managedGroups.HK, managedGroups.JP, managedGroups.SG, PROXIES_GROUP, "DIRECT"], ["DIRECT"]);
+  managedGroups.YouTube = ensureManagedGroup("YouTube", [managedGroups.TW, managedGroups.HK, managedGroups.JP, managedGroups.SG, managedGroups.US, PROXIES_GROUP, "DIRECT"], ["DIRECT"]);
+  managedGroups.Telegram = ensureManagedGroup("Telegram", [managedGroups.TW, managedGroups.HK, managedGroups.JP, managedGroups.SG, managedGroups.US, PROXIES_GROUP], [PROXIES_GROUP]);
   managedGroups.Exchange = ensureManagedGroup("Exchange", [managedGroups.TW, managedGroups.SG], ["REJECT"]);
 
   var managedTargetMap = createNameMap();

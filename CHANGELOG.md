@@ -1,5 +1,15 @@
 # Changelog
 
+## v0.3.36
+
+- **业务组统一「地区优先」**：`Google` / `YouTube` / `Telegram` 三组的第一个选项从兜底组 `Proxies` 改为地区组 `TW`，`Proxies` 降到列表末尾保留。
+  - 此前这三组把 `Proxies` 排首位，默认行为就成了「跟随 `Proxies` 当前选中的节点」——分组形同虚设；此时观察到的出口地区只是 `Proxies` 恰好选到某地区的巧合，换掉 `Proxies` 的节点该服务的地区就跟着变。
+  - 现在每个业务组的默认出口都能一句话说清：`Claude → US`、`AI → US`、`Google / YouTube / Telegram → TW`、`Exchange → TW`。
+  - `fallback` 未变：`Claude` / `AI` / `Exchange` 仍 `REJECT`，`Google` / `YouTube` 仍 `DIRECT`，`Telegram` 仍 `Proxies`。
+- `docs/routing.md` 新增「业务组统一地区优先」章节：列出各组默认值与理由，并记录此次修正的来由。
+- `tests/test-script.js` 新增回归断言：这三个组的首项不得为 `Proxies`，且必须仍包含 `Proxies` 选项（保留「跟随全局」的能力）。已验证把 `Proxies` 改回首项时断言会失败。
+- 本版属**用户可见行为变化**：三个组的默认出口地区改变。升级后需重新激活订阅生效。
+
 ## v0.3.35
 
 - **剔除「提示类节点」**。机场常把「剩余流量 / 套餐到期 / 官网」这类提示做成节点塞进列表，

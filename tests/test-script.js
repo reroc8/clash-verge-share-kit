@@ -668,4 +668,30 @@ if (process.env.MIHOMO_BIN) {
   assert.deepStrictEqual(keep.proxies.map((proxy) => proxy.name), ["香港 01", "US 直连备用"]);
 }
 
+
+// 业务组必须遵循「地区优先」：第一个选项是明确的地区组，不能是兜底组 Proxies。
+// 若把 Proxies 放回首位，该组的默认行为会退化成「跟随 Proxies 当前选中」，
+// 分组形同虚设，且观察到的出口地区会变成 Proxies 选到什么的巧合。
+{
+  const output = run({
+    proxies: [{ name: "香港 01" }, { name: "台湾 01" }, { name: "日本 01" }],
+    "proxy-groups": [],
+    rules: ["MATCH,DIRECT"]
+  });
+
+  for (const name of ["Google", "YouTube", "Telegram"]) {
+    const grp = groupByName(output, name);
+    assert(grp, `${name} 组必须生成`);
+    assert.notStrictEqual(
+      grp.proxies[0],
+      "Proxies",
+      `${name} 组的首选必须是地区组，不能是兜底组 Proxies（否则默认行为退化为跟随兜底）`
+    );
+    assert(
+      grp.proxies.includes("Proxies"),
+      `${name} 组仍应保留 Proxies 选项（排在后面），以便需要时跟随全局`
+    );
+  }
+}
+
 console.log("Script.js regression tests passed");
