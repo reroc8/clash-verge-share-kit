@@ -81,13 +81,21 @@ WorkBuddy AI 国际版的遥测端点 `sg.tgalileo.com` 解析到腾讯云新加
 
 地区受限服务的出口定向：
 
-有三个服务对出口地区有硬性要求，各加了精确规则（都排在通用规则集之前）：
+有四个服务对出口有明确要求，各加了精确规则（都排在通用规则集之前）：
 
 - **Lexmount**（AI Agent 云浏览器，`browser.lexmount.com`）：云浏览器服务需海外出口；该域不在任何规则集内，默认会落到兜底 `DIRECT`。
 
 ```yaml
 - DOMAIN-SUFFIX,lexmount.com,US
 ```
+
+- **订阅服务商面板**（`vx.wjkc.xyz` / `www.wjkc.xyz`）：解析到 Cloudflare（`104.21.x` / `172.67.x`），国内直连常被干扰限速（实测 2–15 秒波动）；该域不在任何规则集内，默认会落到兜底 `DIRECT`。
+
+```yaml
+- DOMAIN-SUFFIX,wjkc.xyz,TW
+```
+
+  目标写地区组名而非兜底组，出口可预期。
 
 - **Meta Muse**（个人 AI 代理，2026-09 起仅北美开放）与 **muse.ai**：需美区出口。Muse 桌面版实际连的是 `graph.facebook.com` 等 Meta 域名（在 `global-domain` 规则集内），按域名无法与服务区分，故用进程名前缀匹配（以覆盖可能存在的 helper 子进程）；网页版入口 `muse.meta.com` 另加域名规则。`muse.ai` 是同名的另一个产品（视频 AI 平台），一并定向。
 
@@ -105,7 +113,7 @@ WorkBuddy AI 国际版的遥测端点 `sg.tgalileo.com` 解析到腾讯云新加
 
   注意这里用 `SG` 而不是 `US`：Dola 明确屏蔽美国 IP，走 `US` 反而不可用。
 
-位次要求：以上规则必须排在 `global-domain`、`tld-proxy`、`cn-domain` 之前。Muse 的进程规则若落到 `global-domain` 之后，`graph.facebook.com` 会先被判给 `Proxies`（默认台湾出口，Muse 不可用）；`muse.ai` 同理会被 `tld-proxy` 抢走。`tests/test-script.js` 对这五条规则都有位次断言。
+位次要求：以上规则必须排在 `global-domain`、`tld-proxy`、`cn-domain` 之前。Muse 的进程规则若落到 `global-domain` 之后，`graph.facebook.com` 会先被判给 `Proxies`（默认台湾出口，Muse 不可用）；`muse.ai` 同理会被 `tld-proxy` 抢走。`tests/test-script.js` 对这六条规则都有位次断言。
 
 取舍：这些是**把某个服务固定到某地区组**，组内节点仍由用户选择。若订阅里没有对应地区的节点，`Script.js` 生成的组会自动过滤，最差回落到 `Proxies`——那时该服务的地区要求可能不满足，属于数据前提不足，不是规则失效。
 

@@ -1,5 +1,15 @@
 # Changelog
 
+## v0.3.37
+
+- **修复：Windows 手动关闭脚本在严格模式下报错退出，关不掉任何东西。**
+  `close-clash-windows.ps1` 对 `Get-NamedProcess` 的返回值直接取 `.Count`——函数返回单个对象或空时会折叠成标量或 `$null`，严格模式 2.0 下取 `.Count` 会直接抛错。真实机器恰是「一个 GUI + 一个内核」，最常见的状态必然触发：双击 `Windows关闭Clash.bat` 只会看到一段报错。现在所有调用点以 `@()` 包裹，提权重启时 `-File` 的路径也补了引号；新增 `tests/test-close-clash-windows.ps1`（无进程 / 单 GUI / 内核存活三场景，全程 stub，不触碰真实进程）。
+- **修复：规则指向「订阅里没有对应节点的地区组」时，mihomo 拒绝整份配置。**
+  `dola.com→SG` 这类规则要求目标组存在，而地区组只在订阅出现对应地区节点时创建——没有新加坡节点的订阅会报 `proxy [SG] not found`，配置完全无法加载。现在 `Script.js` 把指向未创建地区组（HK/JP/SG/TW/US/UK）的规则目标降级到兜底组 `Proxies` 并打日志；目标组存在时不动，订阅自带的节点与自定义组等其他目标一律不碰。`tests/test-script.js` 新增断言与两条真实内核 E2E（Merge.yaml 全量规则 × 有/无 SG·TW 节点的订阅）。
+- **新增 `wjkc.xyz → TW` 定向规则**（订阅服务商面板）：解析到 Cloudflare、国内直连常被干扰限速；位次在通用规则集之前，`docs/routing.md` 已补段落，位次断言一并纳入。
+- **文档与提示同步**：`docs/routing.md` 与 `CHANGELOG` 中 Muse 正则的描述更新为实际发布的前缀匹配写法（`(?i)^muse`）；两个安装器的完成提示补上此前遗漏的 `UK` 组。
+- 本版含用户可见行为变化：Windows 关闭脚本恢复可用、地区组缺失时相关规则会降级并打日志。重新激活订阅后生效。
+
 ## v0.3.36
 
 - **业务组统一「地区优先」**：`Google` / `YouTube` / `Telegram` 三组的第一个选项从兜底组 `Proxies` 改为地区组 `TW`，`Proxies` 降到列表末尾保留。

@@ -342,6 +342,7 @@ function groupByName(config, name) {
     "DOMAIN-SUFFIX,generativeai.google,AI",
     "DOMAIN-SUFFIX,tgalileo.com,Proxies",
     "DOMAIN-SUFFIX,lexmount.com,US",
+    "DOMAIN-SUFFIX,wjkc.xyz,TW",
     "PROCESS-NAME-REGEX,(?i)^muse,US",
     "DOMAIN-SUFFIX,muse.meta.com,US",
     "DOMAIN-SUFFIX,muse.ai,US",
@@ -372,7 +373,7 @@ function groupByName(config, name) {
     "tgalileo rule must precede the generic application bypass layer"
   );
 
-  // 本轮新增的出口定向规则（lexmount / Meta Muse / muse.ai / Dola）。
+  // 出口定向规则（lexmount / wjkc / Meta Muse / muse.ai / Dola）。
   // 位次是它们生效的前提：Muse 桌面版实际连的是 graph.facebook.com（在 global-domain 内），
   // muse.ai 在 tld-proxy 内；lexmount.com 与 dola.com 不在任何规则集（会落到兜底 DIRECT）。
   // 统一断言它们排在全部通用规则集之前。
@@ -380,6 +381,7 @@ function groupByName(config, name) {
   assert(tldProxyIndex > 0, "tld-proxy rule must exist");
   const directedExitRules = [
     "- DOMAIN-SUFFIX,lexmount.com,US",
+    "- DOMAIN-SUFFIX,wjkc.xyz,TW",
     "- PROCESS-NAME-REGEX,(?i)^muse,US",
     "- DOMAIN-SUFFIX,muse.meta.com,US",
     "- DOMAIN-SUFFIX,muse.ai,US",
