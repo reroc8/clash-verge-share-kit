@@ -357,4 +357,39 @@ grep -Fq 'macOS关闭Clash.command' "$RUN3_LOG" || {
 }
 echo "installer points at the close script"
 
+# 4d. 内核存活（服务模式下内核由管理员启动的典型场景）：必须走内核分支、
+# 报告「内核仍在运行」并 exit 0 —— 而不是被当作「无需操作」。
+# 没有这条，把 kernel_pids() 整体删空的变异可以存活（测试仍然全绿）。
+CLOSE3_HOME="$TMP_HOME/close3"
+make_running_env "$CLOSE3_HOME"
+cat > "$CLOSE3_HOME/bin/pgrep" <<'FAKE'
+#!/usr/bin/env sh
+case "$*" in
+  *mihomo*) echo 5151; exit 0 ;;
+  *) exit 1 ;;
+esac
+FAKE
+chmod +x "$CLOSE3_HOME/bin/pgrep"
+write_fake_pkill "$CLOSE3_HOME/bin"
+CLOSE3_LOG="$CLOSE3_HOME/close.log"
+CLOSE3_PKILL_BEFORE="$(wc -l < "$FAKE_PKILL_LOG" | tr -d ' ')"
+if ! PATH="$CLOSE3_HOME/bin:$PATH" bash "$CLOSE_SCRIPT" > "$CLOSE3_LOG" 2>&1 < /dev/null; then
+    echo "close script: kernel-survives path must exit 0"
+    cat "$CLOSE3_LOG"
+    exit 1
+fi
+grep -Fq '内核仍在运行' "$CLOSE3_LOG" || { echo "close script: expected the kernel-still-running report"; cat "$CLOSE3_LOG"; exit 1; }
+CLOSE3_PKILL_AFTER="$(wc -l < "$FAKE_PKILL_LOG" | tr -d ' ')"
+if [ "$CLOSE3_PKILL_BEFORE" = "$CLOSE3_PKILL_AFTER" ]; then
+    echo "close script: kernel path must attempt pkill"
+    exit 1
+fi
+CLOSE3_PKILL_NEW="$(tail -n "+$((CLOSE3_PKILL_BEFORE + 1))" "$FAKE_PKILL_LOG")"
+if ! printf '%s\n' "$CLOSE3_PKILL_NEW" | grep -Fq 'mihomo'; then
+    echo "close script: expected an attempt against the kernel pattern"
+    printf '%s\n' "$CLOSE3_PKILL_NEW"
+    exit 1
+fi
+echo "close script (kernel survives): attempts cleanup, reports, exits 0"
+
 echo "Installer regression tests passed"

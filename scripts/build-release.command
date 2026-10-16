@@ -123,12 +123,13 @@ if [ -n "$POWERSHELL_BIN" ]; then
     # 且 pwsh -Command 会把位置参数拼接进命令文本（$args 恒为空），直接传参必然解析失败
     (
         cd "$ROOT_DIR" || exit 1
-        for ps_file in install/install-windows.ps1 install/sync-profile-bound-files.ps1; do
+        for ps_file in install/install-windows.ps1 install/sync-profile-bound-files.ps1 install/close-clash-windows.ps1; do
             "$POWERSHELL_BIN" -NoProfile -Command \
                 '& { param([string] $path) $tokens = $null; $errors = $null; [void][System.Management.Automation.Language.Parser]::ParseFile((Resolve-Path $path), [ref]$tokens, [ref]$errors); if ($errors.Count -gt 0) { $errors | ForEach-Object { Write-Error $_ }; exit 1 } }' \
                 "$ps_file" || exit 1
         done
         "$POWERSHELL_BIN" -NoProfile -File tests/test-windows-sync.ps1 || exit 1
+        "$POWERSHELL_BIN" -NoProfile -File tests/test-close-clash-windows.ps1 || exit 1
     ) || exit 1
 else
     echo "警告: 未找到 pwsh，已跳过 Windows PowerShell 语法与同步测试"

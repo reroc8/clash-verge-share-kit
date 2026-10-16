@@ -58,6 +58,7 @@ jobs:
         shell: pwsh
         run: |
           pwsh -NoProfile -File tests/test-windows-sync.ps1
+          pwsh -NoProfile -File tests/test-close-clash-windows.ps1
           foreach ($file in @('install/install-windows.ps1', 'install/sync-profile-bound-files.ps1', 'install/close-clash-windows.ps1')) {
             $content = [System.IO.File]::ReadAllText((Join-Path $env:GITHUB_WORKSPACE $file))
             if ($content -match '[^\x00-\x7F]') { throw "$file must stay pure ASCII (PowerShell 5.1)"; }

@@ -309,7 +309,7 @@ try {
     Say-B64 '5LiL5LiA5q2lOg=='
     Say-B64 'ICAxLiDph43mlrDmiZPlvIAgQ2xhc2ggVmVyZ2UgUmV244CC'
     Say-B64 'ICAyLiDlnKjku6PnkIbpobXnoa7orqTog73nnIvliLDov5nkupvliIbnu4Q6'
-    Write-Host '  Claude / AI / Google / YouTube / Telegram / Exchange / US / TW / SG / HK / JP / Proxies'
+    Write-Host '  Claude / AI / Google / YouTube / Telegram / Exchange / US / TW / SG / HK / JP / UK / Proxies'
     $createdEntries = @(Get-Content -LiteralPath $script:CreatedFilesList -Encoding UTF8 | Where-Object { -not [string]::IsNullOrWhiteSpace($_) })
     if ($createdEntries.Count -gt 0) {
         Say-B64 '5o+Q56S6OiBjcmVhdGVkLWZpbGVzLnR4dCDph4zliJflh7rnmoTmlofku7blnKjlronoo4XliY3kuI3lrZjlnKjvvJvnsr7noa7ov5jljp/ml7bpnIDopoHliKDpmaTlroPku6zjgII='

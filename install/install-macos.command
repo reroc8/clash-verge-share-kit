@@ -326,7 +326,7 @@ echo ">>>   backup/.../profiles/ -> $CLASH_DIR/profiles/"
 echo ">>>   backup/.../root/ -> $CLASH_DIR/"
 echo ">>> 配置文件已写入，并已同步已有订阅绑定的 merge/script 文件"
 echo ">>> 重新打开 Clash Verge Rev 后即生效"
-echo ">>> 安装后确认: 代理页能看到 Claude / AI / Google / YouTube / Telegram / Exchange / US / TW / SG / HK / JP / Proxies"
+echo ">>> 安装后确认: 代理页能看到 Claude / AI / Google / YouTube / Telegram / Exchange / US / TW / SG / HK / JP / UK / Proxies"
 if [ -s "$CREATED_FILES_LIST" ]; then
     echo ">>> 提示: created-files.txt 里列出的文件在安装前不存在；精确还原时需要删除它们"
 fi

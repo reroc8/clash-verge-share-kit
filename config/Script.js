@@ -657,6 +657,51 @@ function main(config, profileName) {
     return changed ? parts.join(",") : rule;
   }
 
+  // 规则目标兜底：规则可能引用「地区组」（如 Merge.yaml 的 dola.com→SG、面板域名→TW），
+  // 而地区组只在订阅里出现对应地区节点时才创建。目标组不存在时 mihomo 会拒绝整份
+  // 配置（proxy [SG] not found），用户侧表现为配置完全无法加载。所以把指向「未创建
+  // 地区组」的目标改为兜底组并打日志。
+  // 只动地区组名义名（HK/JP/SG/TW/US/UK）：订阅自带的其他目标（节点名、自定义组）
+  // 不碰 —— 订阅自己的配置错误仍按原样交给内核报错，不静默改写。
+  var finalGroupNameSet = createNameMap();
+  for (var finalGroupIndex = 0; finalGroupIndex < groups.length; finalGroupIndex++) {
+    if (groups[finalGroupIndex] && groups[finalGroupIndex].name) {
+      finalGroupNameSet[groups[finalGroupIndex].name] = true;
+    }
+  }
+  var regionNameSet = createNameMap();
+  for (var regionNameIndex = 0; regionNameIndex < regionOrder.length; regionNameIndex++) {
+    regionNameSet[regionOrder[regionNameIndex]] = true;
+  }
+  var degradedRuleCount = 0;
+  var degradedRegionNames = createNameMap();
+
+  function rewriteMissingRegionTarget(rule) {
+    if (typeof rule !== "string") {
+      return rule;
+    }
+    var parts = splitRuleParts(rule);
+    if (parts.length < 2) {
+      return rule;
+    }
+    var ruleType = String(parts[0] || "").toUpperCase();
+    if (ruleType === "SUB-RULE") {
+      return rule;
+    }
+    var targetIndex = ruleType === "MATCH" || ruleType === "FINAL" ? 1 : 2;
+    if (parts.length <= targetIndex) {
+      return rule;
+    }
+    var target = String(parts[targetIndex] || "").trim();
+    if (!regionNameSet[target.toUpperCase()] || finalGroupNameSet[target]) {
+      return rule;
+    }
+    parts[targetIndex] = PROXIES_GROUP;
+    degradedRuleCount += 1;
+    degradedRegionNames[target] = true;
+    return parts.join(",");
+  }
+
   var exchangeDomains = [
     "okx.com",
     "okx-dns.com",
@@ -750,7 +795,7 @@ function main(config, profileName) {
     }
     var rewrittenRules = [];
     for (var ruleIndex = 0; ruleIndex < ruleList.length; ruleIndex++) {
-      rewrittenRules.push(rewriteRuleTarget(ruleList[ruleIndex]));
+      rewrittenRules.push(rewriteMissingRegionTarget(rewriteRuleTarget(ruleList[ruleIndex])));
     }
     return rewrittenRules;
   }
@@ -766,7 +811,7 @@ function main(config, profileName) {
   var rules = Array.isArray(config.rules) ? config.rules : [];
   var cleanedRules = [];
   for (var r = 0; r < rules.length; r++) {
-    var rewrittenRule = rewriteRuleTarget(rules[r]);
+    var rewrittenRule = rewriteMissingRegionTarget(rewriteRuleTarget(rules[r]));
     if (!isManagedExchangeRule(rewrittenRule)) {
       cleanedRules.push(rewrittenRule);
     }
@@ -819,6 +864,12 @@ function main(config, profileName) {
   }
   cleanedRules.splice.apply(cleanedRules, [insertAt, 0].concat(exchangeRules));
   config.rules = cleanedRules;
+
+  if (degradedRuleCount > 0) {
+    console.log("[clash-verge-share-kit] 已将 " + degradedRuleCount + " 条规则的目标改为兜底组 " +
+      PROXIES_GROUP + "：这些规则指向的地区组（" + Object.keys(degradedRegionNames).join(" / ") +
+      "）在当前订阅里没有对应节点。需要固定到对应地区时，请给订阅补充该地区节点。");
+  }
 
   return config;
 }

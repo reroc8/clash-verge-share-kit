@@ -19,6 +19,10 @@ $kernelNames = @('verge-mihomo*', 'mihomo')
 $helperNames = @('clash-verge-service')
 $serviceNames = @('clash_verge_service', 'clash-verge-service')
 
+# Callers must re-wrap results with @(): a function that returns one object (or
+# none) collapses to a scalar or $null, and .Count on those throws under
+# StrictMode 2.0 - aborting the script before it can close anything. (A real
+# machine has exactly one GUI and one kernel, so this is the normal path.)
 function Get-NamedProcess {
     param([string[]] $Names)
     return @(Get-Process -Name $Names -ErrorAction SilentlyContinue)
@@ -48,12 +52,12 @@ function Test-IsElevated {
 Say-B64 '5YWz6ZetIENsYXNoIFZlcmdlIFJldiDlj4rlhbblhoXmoLg='
 Write-Host ''
 
-$runningGui = Get-NamedProcess $guiNames
-$runningKernel = Get-NamedProcess $kernelNames
+$runningGui = @(Get-NamedProcess $guiNames)
+$runningKernel = @(Get-NamedProcess $kernelNames)
 
 if ($runningGui.Count -eq 0 -and $runningKernel.Count -eq 0) {
     Say-B64 '5rKh5pyJ5Y+R546w5q2j5Zyo6L+Q6KGM55qEIENsYXNoIFZlcmdlIFJldiDmiJblhoXmoLjvvIzml6DpnIDmk43kvZw='
-    if ((Get-NamedProcess $helperNames).Count -gt 0) {
+    if (@(Get-NamedProcess $helperNames).Count -gt 0) {
         Say-B64 '5rOoOiDluLjpqbvliqnmiYsgY2xhc2gtdmVyZ2Utc2VydmljZSDku43lnKjov5DooYzvvIzov5nmmK/mraPluLjnmoTvvIzkuI3lvbHlk43lronoo4U='
     }
     exit 0
@@ -88,8 +92,8 @@ foreach ($serviceName in $serviceNames) {
     }
 }
 
-$runningGui = Get-NamedProcess $guiNames
-$runningKernel = Get-NamedProcess $kernelNames
+$runningGui = @(Get-NamedProcess $guiNames)
+$runningKernel = @(Get-NamedProcess $kernelNames)
 
 if ($runningGui.Count -eq 0 -and $runningKernel.Count -eq 0) {
     Say-B64 '57uT5p6cOiBDbGFzaCBWZXJnZSBSZXYg5Y+K5YW25YaF5qC46YO95bey5YWz6Zet77yM546w5Zyo5Y+v5Lul6L+Q6KGM5a6J6KOF5Zmo5LqG'
@@ -116,8 +120,12 @@ if (-not (Test-IsElevated)) {
     }
     if ($answer -match '^(y|yes)$') {
         try {
+            # -File value must carry its own quotes: Start-Process joins
+            # ArgumentList with spaces and does not quote elements, so an
+            # unquoted path with spaces would be split and the elevated
+            # relaunch would silently fail.
             Start-Process -FilePath 'powershell' -Verb RunAs -ArgumentList @(
-                '-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', $PSCommandPath
+                '-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', ('"' + $PSCommandPath + '"')
             ) -ErrorAction Stop
         } catch {
             $null = $_

@@ -89,10 +89,10 @@ WorkBuddy AI 国际版的遥测端点 `sg.tgalileo.com` 解析到腾讯云新加
 - DOMAIN-SUFFIX,lexmount.com,US
 ```
 
-- **Meta Muse**（个人 AI 代理，2026-09 起仅北美开放）与 **muse.ai**：需美区出口。Muse 桌面版实际连的是 `graph.facebook.com` 等 Meta 域名（在 `global-domain` 规则集内），按域名无法与服务区分，故用进程名匹配；网页版入口 `muse.meta.com` 另加域名规则。`muse.ai` 是同名的另一个产品（视频 AI 平台），一并定向。
+- **Meta Muse**（个人 AI 代理，2026-09 起仅北美开放）与 **muse.ai**：需美区出口。Muse 桌面版实际连的是 `graph.facebook.com` 等 Meta 域名（在 `global-domain` 规则集内），按域名无法与服务区分，故用进程名前缀匹配（以覆盖可能存在的 helper 子进程）；网页版入口 `muse.meta.com` 另加域名规则。`muse.ai` 是同名的另一个产品（视频 AI 平台），一并定向。
 
 ```yaml
-- PROCESS-NAME-REGEX,(?i)^muse$,US
+- PROCESS-NAME-REGEX,(?i)^muse,US
 - DOMAIN-SUFFIX,muse.meta.com,US
 - DOMAIN-SUFFIX,muse.ai,US
 ```

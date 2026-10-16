@@ -15,6 +15,47 @@ function run(config) {
   return main(JSON.parse(JSON.stringify(config)), "test-profile");
 }
 
+// Merge.yaml 的解析 + 下载源替身：E2E 必须让「Merge.yaml 的规则」与订阅真正一起跑一遍。
+// 此前对 Merge.yaml 的断言都只看字符串（规则存在、provider 有定义），规则本身从未
+// 在「无对应地区节点的订阅」上通过内核校验 —— 而 dola.com→SG 正是在这种订阅上
+// 让 mihomo 拒绝整份配置（proxy [SG] not found）。
+function mergeRulesFromYaml(source) {
+  const rules = [];
+  const lines = source.split(/\r?\n/);
+  let inRules = false;
+  for (const line of lines) {
+    if (/^rules:\s*$/.test(line)) {
+      inRules = true;
+      continue;
+    }
+    if (inRules) {
+      if (/^[A-Za-z0-9_-]+:/.test(line)) {
+        break;
+      }
+      const match = line.match(/^\s{2}- (.+)$/);
+      if (match) {
+        rules.push(match[1].trim());
+      }
+    }
+  }
+  return rules;
+}
+
+function mergeProviderStubs(rules) {
+  const names = new Set();
+  for (const rule of rules) {
+    const match = /^RULE-SET,([^,]+),/.exec(rule);
+    if (match) {
+      names.add(match[1]);
+    }
+  }
+  const providers = {};
+  for (const name of names) {
+    providers[name] = { type: "inline", behavior: "domain", payload: [] };
+  }
+  return providers;
+}
+
 function groupByName(config, name) {
   return (config["proxy-groups"] || []).find((group) => group.name === name);
 }
@@ -550,6 +591,81 @@ function groupByName(config, name) {
   assert(groupByName(output, "Custom"), "case-variant custom group reference must disable compaction");
 }
 
+// 规则指向的地区组可能不存在（订阅里没有对应地区的节点）：目标必须降级到兜底组，
+// 否则 mihomo 会因 proxy [SG] not found 拒绝整份配置（发布包实测过）。
+{
+  const logs = [];
+  const originalLog = console.log;
+  let output;
+  console.log = (...args) => { logs.push(args.join(" ")); };
+  try {
+    output = run({
+      proxies: [{ name: "HKG-01" }, { name: "US-01" }],
+      "proxy-groups": [],
+      rules: [
+        "DOMAIN-SUFFIX,dola.com,SG",
+        "DOMAIN-SUFFIX,wjkc.xyz,TW",
+        "DOMAIN-SUFFIX,lexmount.com,US",
+        "MATCH,DIRECT"
+      ]
+    });
+  } finally {
+    console.log = originalLog;
+  }
+
+  assert(!groupByName(output, "SG"), "订阅无新加坡节点时不应生成 SG 组");
+  assert(!groupByName(output, "TW"), "订阅无台湾节点时不应生成 TW 组");
+  assert(output.rules.includes("DOMAIN-SUFFIX,dola.com,Proxies"), "指向缺失 SG 组的规则必须降级到 Proxies");
+  assert(output.rules.includes("DOMAIN-SUFFIX,wjkc.xyz,Proxies"), "指向缺失 TW 组的规则必须降级到 Proxies");
+  assert(output.rules.includes("DOMAIN-SUFFIX,lexmount.com,US"), "US 兜底组始终存在，目标不应被动");
+  assert(logs.some((line) => line.includes("兜底组")), "降级必须打日志告知用户");
+}
+
+// 有对应地区节点时目标保持原样（不得误降级）
+{
+  const output = run({
+    proxies: [{ name: "新加坡 01" }, { name: "台湾 01" }],
+    "proxy-groups": [],
+    rules: ["DOMAIN-SUFFIX,dola.com,SG", "DOMAIN-SUFFIX,wjkc.xyz,TW", "MATCH,DIRECT"]
+  });
+
+  assert(groupByName(output, "SG"), "订阅有新加坡节点时必须生成 SG 组");
+  assert(groupByName(output, "TW"), "订阅有台湾节点时必须生成 TW 组");
+  assert(output.rules.includes("DOMAIN-SUFFIX,dola.com,SG"), "SG 组存在时目标必须保持 SG");
+  assert(output.rules.includes("DOMAIN-SUFFIX,wjkc.xyz,TW"), "TW 组存在时目标必须保持 TW");
+}
+
+// sub-rule 列表里的地区组目标同样兜底
+{
+  const output = run({
+    proxies: [{ name: "US-01" }],
+    "proxy-groups": [],
+    "sub-rules": { custom: ["DOMAIN-SUFFIX,dola.com,SG"] },
+    rules: ["SUB-RULE,(NETWORK,TCP),custom", "MATCH,DIRECT"]
+  });
+
+  assert.deepStrictEqual(
+    output["sub-rules"].custom,
+    ["DOMAIN-SUFFIX,dola.com,Proxies"],
+    "sub-rule 内的地区组目标同样必须降级"
+  );
+}
+
+// 订阅自建同名组且未被压缩时，组仍在，目标不得被动（防过度降级）
+{
+  const output = run({
+    proxies: [{ name: "US-01" }],
+    "proxy-groups": [
+      { name: "SG", type: "select", proxies: ["US-01"] },
+      { name: "Custom", type: "select", proxies: ["SG"] }
+    ],
+    rules: ["DOMAIN-SUFFIX,example.test,Custom", "DOMAIN-SUFFIX,dola.com,SG", "MATCH,DIRECT"]
+  });
+
+  assert(groupByName(output, "SG"), "非压缩模式下订阅自建 SG 组必须保留");
+  assert(output.rules.includes("DOMAIN-SUFFIX,dola.com,SG"), "目标组存在时不得降级");
+}
+
 if (process.env.MIHOMO_BIN) {
   const httpProxy = (name, port, extra = {}) => ({
     name,
@@ -558,6 +674,10 @@ if (process.env.MIHOMO_BIN) {
     port,
     ...extra
   });
+  const mergeRules = mergeRulesFromYaml(mergeSource);
+  assert(mergeRules.length > 100, "Merge.yaml must keep providing the routing rule set");
+  const mergeProviders = mergeProviderStubs(mergeRules);
+
   const mihomoCases = [
     {
       name: "dialer-proxy compact dependency",
@@ -589,6 +709,24 @@ if (process.env.MIHOMO_BIN) {
         },
         "sub-rules": { REJECT: ["DOMAIN,keep.example.test,DIRECT", "RULE-SET,reject,REJECT"] },
         rules: ["SUB-RULE,(NETWORK,TCP),REJECT", "MATCH,DIRECT"]
+      }
+    },
+    {
+      name: "merge rules with a subscription that has SG/TW nodes",
+      config: {
+        proxies: [httpProxy("新加坡 01", 18084), httpProxy("台湾 01", 18085)],
+        "proxy-groups": [],
+        "rule-providers": mergeProviders,
+        rules: mergeRules.concat(["MATCH,DIRECT"])
+      }
+    },
+    {
+      name: "merge rules with a subscription that lacks SG/TW nodes",
+      config: {
+        proxies: [httpProxy("HKG-01", 18086), httpProxy("US-01", 18087)],
+        "proxy-groups": [],
+        "rule-providers": mergeProviders,
+        rules: mergeRules.concat(["MATCH,DIRECT"])
       }
     }
   ];
