@@ -3,7 +3,6 @@ setlocal
 
 set "SCRIPT_DIR=%~dp0"
 set "CLOSE_PS1=%SCRIPT_DIR%close-clash-windows.ps1"
-if not exist "%CLOSE_PS1%" set "CLOSE_PS1=%SCRIPT_DIR%install\close-clash-windows.ps1"
 
 where powershell >nul 2>nul
 if errorlevel 1 (

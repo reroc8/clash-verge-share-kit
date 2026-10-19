@@ -16,6 +16,7 @@
 
    ```bash
    bash tests/test-installers.sh                              # 安装器与关闭脚本（仅 macOS）
+   bash tests/test-monitor.sh                                 # 监控脚本（负增量 / 大响应 / 时长，约 7 秒）
    MIHOMO_BIN=<mihomo 路径> node tests/test-script.js         # Script.js + Merge.yaml（真实内核校验）
    pwsh -NoProfile -File tests/test-close-clash-windows.ps1   # Windows 关闭脚本（任意装有 pwsh 的平台）
    bash scripts/check-sensitive.sh                            # 提交前敏感扫描

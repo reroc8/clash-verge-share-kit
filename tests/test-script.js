@@ -777,6 +777,40 @@ if (process.env.MIHOMO_BIN) {
 }
 
 {
+  // 机场直接用 IATA 三字码命名节点（HKG-01 / LAX-02 / NRT-03 …）：
+  // 不识别的话这些节点不会进地区组，Claude/AI/Exchange 会整体退化成 REJECT。
+  const output = run({
+    proxies: [
+      { name: "HKG-01" },
+      { name: "NRT-02" },
+      { name: "SIN-03" },
+      { name: "TPE-04" },
+      { name: "LAX-05" },
+      { name: "LHR-06" }
+    ],
+    "proxy-groups": [],
+    rules: ["MATCH,DIRECT"]
+  });
+
+  assert.deepStrictEqual(groupByName(output, "HK").proxies, ["HKG-01"], "IATA HKG 要能识别成香港");
+  assert.deepStrictEqual(groupByName(output, "JP").proxies, ["NRT-02"], "IATA NRT 要能识别成日本");
+  assert.deepStrictEqual(groupByName(output, "SG").proxies, ["SIN-03"], "IATA SIN 要能识别成新加坡");
+  assert.deepStrictEqual(groupByName(output, "TW").proxies, ["TPE-04"], "IATA TPE 要能识别成台湾");
+  assert.deepStrictEqual(groupByName(output, "US").proxies, ["LAX-05"], "IATA LAX 要能识别成美国");
+  assert.deepStrictEqual(groupByName(output, "UK").proxies, ["LHR-06"], "IATA LHR 要能识别成英国");
+}
+
+{
+  // 三字码必须按字母边界匹配：HKGX 这种名字不能被当成 HKG。
+  const output = run({
+    proxies: [{ name: "HKGX-99" }],
+    "proxy-groups": [],
+    rules: ["MATCH,DIRECT"]
+  });
+  assert(!groupByName(output, "HK"), "HKG 不能匹配 HKGX");
+}
+
+{
   // 提示类节点（剩余流量 / 套餐到期 / 官网…）必须被排除，不进任何组。
   // 它们的名字随订阅更新变化，选中会让出口 IP 漂到别处 —— 表现为 X 掉登录、
   // Discord 反复跳认证、AI 服务被风控，而且看不出是节点的问题。

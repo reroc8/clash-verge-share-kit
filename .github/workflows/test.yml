@@ -53,6 +53,10 @@ jobs:
         if: runner.os == 'macOS'
         run: bash tests/test-installers.sh
 
+      - name: Monitor script regression tests (macOS)
+        if: runner.os == 'macOS'
+        run: bash tests/test-monitor.sh
+
       - name: Windows PowerShell sync tests
         if: runner.os == 'Windows'
         shell: pwsh
@@ -82,3 +86,4 @@ jobs:
           bash -n scripts/check-sensitive.sh
           bash -n scripts/build-release.command
           bash -n tests/test-installers.sh
+          bash -n tests/test-monitor.sh

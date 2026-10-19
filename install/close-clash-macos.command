@@ -4,11 +4,13 @@
 # 用途：安装器提示「Clash Verge Rev 仍在运行」或「内核仍在运行」时，双击本文件。
 # 说明：内核在服务模式下由管理员权限启动，普通权限结束不了，脚本会询问是否用管理员权限。
 #       常驻助手 clash-verge-service 是系统服务，退出 Clash 后照常在跑，属正常，不影响安装。
+# 退出码：还有进程没关掉时返回 1（与 Windows 版语义一致），全部关闭返回 0。
 set -euo pipefail
 
 GUI_PATTERN="clash-verge"
 GUI_PATTERN_SPACED="clash verge"
-KERNEL_PATTERN="mihomo"
+# 内核按精确进程名匹配：用 "mihomo" 子串会顺带命中别的客户端（如 mihomo-party）或无关进程。
+KERNEL_NAMES="verge-mihomo verge-mihomo-alpha mihomo"
 SERVICE_NAME="clash-verge-service"
 
 gui_pids() {
@@ -17,7 +19,17 @@ gui_pids() {
 }
 
 kernel_pids() {
-    pgrep -i "$KERNEL_PATTERN" 2>/dev/null
+    local name
+    for name in $KERNEL_NAMES; do
+        pgrep -x "$name" 2>/dev/null || true
+    done
+}
+
+kill_kernel() {
+    local signal="$1" name
+    for name in $KERNEL_NAMES; do
+        pkill "-$signal" -x "$name" 2>/dev/null || true
+    done
 }
 
 service_pids() {
@@ -50,7 +62,7 @@ fi
 
 if [ -n "$(kernel_pids)" ]; then
     echo ">>> 正在关闭内核..."
-    pkill -i "$KERNEL_PATTERN" 2>/dev/null || true
+    kill_kernel TERM
 fi
 
 sleep 1
@@ -59,7 +71,7 @@ if [ -n "$(gui_pids)" ] || [ -n "$(kernel_pids)" ]; then
     echo ">>> 有进程没响应，改用强制结束..."
     pkill -KILL -u "$(id -u)" -i "$GUI_PATTERN" 2>/dev/null || true
     pkill -KILL -u "$(id -u)" -i "$GUI_PATTERN_SPACED" 2>/dev/null || true
-    pkill -KILL -i "$KERNEL_PATTERN" 2>/dev/null || true
+    kill_kernel KILL
     sleep 1
 fi
 
@@ -95,9 +107,12 @@ fi
 if [ -n "$(kernel_pids)" ]; then
     echo ""
     echo ">>> 结果: 内核仍在运行。安装不受影响；也可以在 Clash Verge Rev 里关闭「服务模式」后重试"
-else
-    echo ""
-    echo ">>> 结果: Clash Verge Rev 及其内核都已关闭，现在可以运行安装器了"
+    pause_before_close
+    # 与 Windows 关闭脚本语义一致：还有进程没关掉就算失败。
+    exit 1
 fi
 
+echo ""
+echo ">>> 结果: Clash Verge Rev 及其内核都已关闭，现在可以运行安装器了"
 pause_before_close
+exit 0

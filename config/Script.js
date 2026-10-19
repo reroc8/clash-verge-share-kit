@@ -449,21 +449,31 @@ function main(config, profileName) {
     PROXIES_GROUP = ensureManagedGroup("Proxies", generalOptions, ["DIRECT"]);
   }
 
-  // 地区识别。除了国名缩写，还要覆盖两类容易被漏掉的写法：
+  // 地区识别。除了国名缩写，还要覆盖三类容易被漏掉的写法：
   //   1. 只有城市名、不带国名也不带旗帜的节点，如「Los Angeles 01」「大阪 02」
   //   2. 机场自己造的缩写，如「沪美」「深港」「沪日」
+  //   3. 直接用 IATA 三字码命名的节点，如「HKG-01」「LAX-02」「NRT-03」
   // 参考同类规则项目（LingJingMaster/Shadowrocket-Rules、IvanSolis1989/Smart-Config-Kit）。
   // 刻意**不写单字**（如「美」「港」）—— 会误匹配到无关的词。
+  // 三字码用字母边界匹配：SINGAPORE 里的子串不会被当成 SIN。
+  function iataCode(code) {
+    return new RegExp("(^|[^A-Za-z])" + code + "([^A-Za-z]|$)", "i");
+  }
+
   var regionPatterns = {
-    HK: [/香港/i, /Hong Kong/i, /(^|[^A-Za-z])HK([^A-Za-z]|$)/i, /🇭🇰/, /深港/, /沪港/, /京港/, /广港/],
-    JP: [/日本/i, /Japan/i, /Tokyo/i, /Osaka/i, /(^|[^A-Za-z])JP([^A-Za-z]|$)/i, /🇯🇵/, /东京/i, /大阪/i, /沪日/],
-    SG: [/新加坡/i, /Singapore/i, /(^|[^A-Za-z])SG([^A-Za-z]|$)/i, /🇸🇬/, /狮城/],
+    HK: [/香港/i, /Hong Kong/i, /(^|[^A-Za-z])HK([^A-Za-z]|$)/i, /🇭🇰/, /深港/, /沪港/, /京港/, /广港/,
+         iataCode("HKG")],
+    JP: [/日本/i, /Japan/i, /Tokyo/i, /Osaka/i, /(^|[^A-Za-z])JP([^A-Za-z]|$)/i, /🇯🇵/, /东京/i, /大阪/i, /沪日/,
+         iataCode("NRT"), iataCode("HND"), iataCode("KIX")],
+    SG: [/新加坡/i, /Singapore/i, /(^|[^A-Za-z])SG([^A-Za-z]|$)/i, /🇸🇬/, /狮城/, iataCode("SIN")],
     TW: [/台湾/i, /台灣/i, /臺灣/i, /Taiwan/i, /(^|[^A-Za-z])TW([^A-Za-z]|$)/i, /🇹🇼/,
-         /Taipei/i, /台北/i, /新北/i, /台中/i],
+         /Taipei/i, /台北/i, /新北/i, /台中/i, iataCode("TPE")],
     US: [/美国/i, /美國/i, /United States/i, /(^|[^A-Za-z])US([^A-Za-z]|$)/i, /(^|[^A-Za-z])USA([^A-Za-z]|$)/i, /🇺🇸/,
          /Los Angeles/i, /San Jose/i, /Seattle/i, /Chicago/i, /New York/i, /Dallas/i, /Phoenix/i, /Silicon Valley/i,
-         /洛杉矶/i, /圣何塞/i, /西雅图/i, /芝加哥/i, /纽约/i, /达拉斯/i, /凤凰城/i, /硅谷/i, /沪美/],
-    UK: [/英国/i, /英國/i, /United Kingdom/i, /Britain/i, /England/i, /London/i, /(^|[^A-Za-z])UK([^A-Za-z]|$)/i, /🇬🇧/, /伦敦/i]
+         /洛杉矶/i, /圣何塞/i, /西雅图/i, /芝加哥/i, /纽约/i, /达拉斯/i, /凤凰城/i, /硅谷/i, /沪美/,
+         iataCode("LAX"), iataCode("SFO"), iataCode("SJC"), iataCode("SEA"), iataCode("JFK"), iataCode("ORD")],
+    UK: [/英国/i, /英國/i, /United Kingdom/i, /Britain/i, /England/i, /London/i, /(^|[^A-Za-z])UK([^A-Za-z]|$)/i, /🇬🇧/, /伦敦/i,
+         iataCode("LHR")]
   };
 
   var managedGroups = {

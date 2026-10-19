@@ -5,9 +5,14 @@ ROOT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 TMP_HOME="$(mktemp -d "${TMPDIR:-/tmp}/clash-installer-test.XXXXXX")"
 trap 'rm -rf "$TMP_HOME"' EXIT
 
-grep -Fq '%SCRIPT_DIR%install\install-windows.ps1' "$ROOT_DIR/install/install-windows.bat"
-if grep -Fq '%SCRIPT_DIR%..\install\install-windows.ps1' "$ROOT_DIR/install/install-windows.bat"; then
-    echo "Windows BAT still contains the invalid parent-directory fallback"
+grep -Fq '%SCRIPT_DIR%install-windows.ps1' "$ROOT_DIR/install/install-windows.bat"
+if grep -Eq '%SCRIPT_DIR%(install|\.\.\\install)\\install-windows\.ps1' "$ROOT_DIR/install/install-windows.bat"; then
+    echo "Windows BAT still contains an impossible fallback path"
+    exit 1
+fi
+grep -Fq '%SCRIPT_DIR%close-clash-windows.ps1' "$ROOT_DIR/install/close-clash-windows.bat"
+if grep -Eq '%SCRIPT_DIR%(install|\.\.\\install)\\close-clash-windows\.ps1' "$ROOT_DIR/install/close-clash-windows.bat"; then
+    echo "Close BAT still contains an impossible fallback path"
     exit 1
 fi
 if grep -Eq '& powershell .*\| Out-Null' "$ROOT_DIR/install/install-windows.ps1"; then
@@ -358,7 +363,7 @@ grep -Fq 'macOS关闭Clash.command' "$RUN3_LOG" || {
 echo "installer points at the close script"
 
 # 4d. 内核存活（服务模式下内核由管理员启动的典型场景）：必须走内核分支、
-# 报告「内核仍在运行」并 exit 0 —— 而不是被当作「无需操作」。
+# 报告「内核仍在运行」并 exit 1（与 Windows 版语义一致）—— 而不是被当作「无需操作」。
 # 没有这条，把 kernel_pids() 整体删空的变异可以存活（测试仍然全绿）。
 CLOSE3_HOME="$TMP_HOME/close3"
 make_running_env "$CLOSE3_HOME"
@@ -373,8 +378,10 @@ chmod +x "$CLOSE3_HOME/bin/pgrep"
 write_fake_pkill "$CLOSE3_HOME/bin"
 CLOSE3_LOG="$CLOSE3_HOME/close.log"
 CLOSE3_PKILL_BEFORE="$(wc -l < "$FAKE_PKILL_LOG" | tr -d ' ')"
-if ! PATH="$CLOSE3_HOME/bin:$PATH" bash "$CLOSE_SCRIPT" > "$CLOSE3_LOG" 2>&1 < /dev/null; then
-    echo "close script: kernel-survives path must exit 0"
+CLOSE3_EXIT=0
+PATH="$CLOSE3_HOME/bin:$PATH" bash "$CLOSE_SCRIPT" > "$CLOSE3_LOG" 2>&1 < /dev/null || CLOSE3_EXIT=$?
+if [ "$CLOSE3_EXIT" -ne 1 ]; then
+    echo "close script: kernel-survives path must exit 1, got $CLOSE3_EXIT"
     cat "$CLOSE3_LOG"
     exit 1
 fi
@@ -390,6 +397,6 @@ if ! printf '%s\n' "$CLOSE3_PKILL_NEW" | grep -Fq 'mihomo'; then
     printf '%s\n' "$CLOSE3_PKILL_NEW"
     exit 1
 fi
-echo "close script (kernel survives): attempts cleanup, reports, exits 0"
+echo "close script (kernel survives): attempts cleanup, reports, exits 1"
 
 echo "Installer regression tests passed"
