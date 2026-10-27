@@ -346,7 +346,9 @@ function groupByName(config, name) {
     "PROCESS-NAME-REGEX,(?i)^muse,US",
     "DOMAIN-SUFFIX,muse.meta.com,US",
     "DOMAIN-SUFFIX,muse.ai,US",
-    "DOMAIN-SUFFIX,dola.com,SG"
+    "DOMAIN-SUFFIX,dola.com,SG",
+    "DOMAIN-SUFFIX,priceai.cc,Google",
+    "DOMAIN-SUFFIX,982xj.xyz,Google"
   ];
   for (const rule of requiredBusinessRules) {
     assert(mergeSource.includes(`- ${rule}`), `${rule} must remain in Merge.yaml`);
@@ -373,9 +375,10 @@ function groupByName(config, name) {
     "tgalileo rule must precede the generic application bypass layer"
   );
 
-  // 出口定向规则（lexmount / wjkc / Meta Muse / muse.ai / Dola）。
+  // 出口定向规则（lexmount / wjkc / Meta Muse / muse.ai / Dola / PriceAI / 982xj）。
   // 位次是它们生效的前提：Muse 桌面版实际连的是 graph.facebook.com（在 global-domain 内），
-  // muse.ai 在 tld-proxy 内；lexmount.com 与 dola.com 不在任何规则集（会落到兜底 DIRECT）。
+  // muse.ai 在 tld-proxy 内；lexmount.com、dola.com、priceai.cc 与 982xj.xyz 不在任何规则集
+  // （会落到兜底 DIRECT，实测国内直连 Cloudflare 落 LAX、秒级超时）。
   // 统一断言它们排在全部通用规则集之前。
   const tldProxyIndex = mergeSource.indexOf("- RULE-SET,tld-proxy,Proxies");
   assert(tldProxyIndex > 0, "tld-proxy rule must exist");
@@ -385,7 +388,9 @@ function groupByName(config, name) {
     "- PROCESS-NAME-REGEX,(?i)^muse,US",
     "- DOMAIN-SUFFIX,muse.meta.com,US",
     "- DOMAIN-SUFFIX,muse.ai,US",
-    "- DOMAIN-SUFFIX,dola.com,SG"
+    "- DOMAIN-SUFFIX,dola.com,SG",
+    "- DOMAIN-SUFFIX,priceai.cc,Google",
+    "- DOMAIN-SUFFIX,982xj.xyz,Google"
   ];
   for (const directedRule of directedExitRules) {
     const directedIndex = mergeSource.indexOf(directedRule);

@@ -113,7 +113,16 @@ WorkBuddy AI 国际版的遥测端点 `sg.tgalileo.com` 解析到腾讯云新加
 
   注意这里用 `SG` 而不是 `US`：Dola 明确屏蔽美国 IP，走 `US` 反而不可用。
 
-位次要求：以上规则必须排在 `global-domain`、`tld-proxy`、`cn-domain` 之前。Muse 的进程规则若落到 `global-domain` 之后，`graph.facebook.com` 会先被判给 `Proxies`（默认台湾出口，Muse 不可用）；`muse.ai` 同理会被 `tld-proxy` 抢走。`tests/test-script.js` 对这六条规则都有位次断言。
+- **PriceAI**（`priceai.cc`，AI 订阅/中转 API 比价雷达）与 **982xj.xyz**：都是 Cloudflare 站点（`104.21.x` / `172.67.x`），不在任何规则集内，默认落兜底 `MATCH,DIRECT`。实测国内直连极差——`priceai.cc` 3 次里 2 次 5 秒超时，成功那次 TLS 握手 5.5s、首字节 11.2s；`982xj.xyz` 3 次里 1 次超时，成功那次 TLS 1.2–3.1s、首字节 2.6–3.8s，CF-RAY 落 LAX。同一批域经台湾节点实测 38ms。
+
+```yaml
+- DOMAIN-SUFFIX,priceai.cc,Google
+- DOMAIN-SUFFIX,982xj.xyz,Google
+```
+
+  目标写 `Google` 组而非具体地区组：该组由 `Script.js` 保证存在、默认台湾出口；地区组在订阅缺对应节点时会被降级到 `Proxies`，`Google` 组不会。
+
+位次要求：以上规则必须排在 `global-domain`、`tld-proxy`、`cn-domain` 之前。Muse 的进程规则若落到 `global-domain` 之后，`graph.facebook.com` 会先被判给 `Proxies`（默认台湾出口，Muse 不可用）；`muse.ai` 同理会被 `tld-proxy` 抢走。`tests/test-script.js` 对这八条规则都有位次断言。
 
 取舍：这些是**把某个服务固定到某地区组**，组内节点仍由用户选择。若订阅里没有对应地区的节点，`Script.js` 生成的组会自动过滤，最差回落到 `Proxies`——那时该服务的地区要求可能不满足，属于数据前提不足，不是规则失效。
 

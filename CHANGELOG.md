@@ -14,7 +14,8 @@
 - **Windows 批处理删除死路径回退**：`install\*.bat` 里 `%SCRIPT_DIR%install\...` 的回退在任何布局下都不可能命中（仓库里 bat 就在 `install/` 内；发布包里 ps1 与 bat 同级）；测试断言同步修正——原先反而把这个死路径当成了预期。
 - **README 补充**：安装会用包内模板覆盖 `verge.yaml` / `dns_config.yaml`，原文件在 `backup_*/root/` 备份中，可按需拷回。
 - `tests/test-monitor.sh` 新增监控脚本回归测试（大响应 / 负增量 / 私有状态目录 / 时长按秒），接入 CI。
-- 本版含**用户可见行为变化**：监控时长按秒计、CSV 不再出现负值；订阅里用 IATA 三字码命名节点的用户，升级后地区组会包含这些节点；macOS 关闭脚本在内核存活时返回 1。规则文件（`Merge.yaml`）无变化；地区识别在 `Script.js` 里，重新激活订阅后生效。
+- **新增两条定向规则**：`priceai.cc`（AI 订阅比价站）与 `982xj.xyz` 都是 Cloudflare 站点，不在任何规则集内、默认落兜底 `DIRECT`；国内直连实测秒级超时、CF-RAY 落 LAX（同域经台湾节点 38ms）。现改为前置走 `Google` 组（该组恒存在、默认台湾出口）。`docs/routing.md` 已补段落，位次断言纳入 `tests/test-script.js`。
+- 本版含**用户可见行为变化**：监控时长按秒计、CSV 不再出现负值；订阅里用 IATA 三字码命名节点的用户，升级后地区组会包含这些节点；macOS 关闭脚本在内核存活时返回 1；`priceai.cc` 与 `982xj.xyz` 改为走代理。地区识别在 `Script.js` 里，重新激活订阅后生效。
 
 ## v0.3.37
 

@@ -120,6 +120,13 @@ rules:
   # Dola（字节豆包海外版，dola.com）：区域锁定，US / CA / AU / 中国大陆均不可用，
   # 主力市场为东南亚与英国。用 SG 地区组，禁用 US 组。
   - DOMAIN-SUFFIX,dola.com,SG
+  # PriceAI（priceai.cc，AI 订阅/中转 API 比价雷达）与 982xj.xyz：都是 Cloudflare 站点
+  # （104.21.x / 172.67.x），不在任何规则集内，默认落兜底 MATCH,DIRECT；实测国内直连极差
+  # （priceai：3 次里 2 次 5 秒超时，成功那次 TLS 5.5s、首字节 11.2s；982xj：3 次里 1 次超时，
+  # 成功那次 TLS 1.2–3.1s、首字节 2.6–3.8s，CF-RAY 落 LAX；同域走台湾节点实测 38ms）。
+  # 前置精确规则改走 Google 组——该组恒存在且默认台湾出口，不会因订阅缺地区节点而降级。
+  - DOMAIN-SUFFIX,priceai.cc,Google
+  - DOMAIN-SUFFIX,982xj.xyz,Google
   # Google account / auth / billing stay on the stable Google group
   - DOMAIN,accounts.google.com,Google
   - DOMAIN,myaccount.google.com,Google
