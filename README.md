@@ -13,11 +13,13 @@
 
 | 你打开的网站 | 走的线路 |
 |---|---|
-| Claude / ChatGPT / Gemini / Copilot 等国际 AI | 🤖 `Claude` = US ｜ `AI` = US / TW |
+| Claude / ChatGPT / Codex / Copilot 等国际 AI | 🤖 `AI` = US |
+| Gemini / NotebookLM / Google AI | 🔎 `Google + YouTube + Telegram` = TW |
 | DeepSeek / Kimi / 豆包 / 通义 等大陆 AI | 🏠 直连 |
-| Google / YouTube / Telegram | 🌐 各自独立分组 |
+| Google / YouTube / Telegram | 🌐 `Google + YouTube + Telegram` = TW |
 | OKX / Bybit / Binance 等交易所 | 💱 `Exchange`，锁定 TW · SG |
-| Lexmount（AI 云浏览器）· Meta Muse | 🇺🇸 走 `US`（Muse 仅北美开放） |
+| Lexmount（AI 云浏览器） | 🇺🇸 走 `US` |
+| Meta Muse | 🤖 走 `AI`（AI 组固定 US） |
 | Dola（豆包海外版） | 🇸🇬 走 `SG`（美/加/澳/中国大陆不可用） |
 | 国内网站 · 局域网 | 🏠 直连 |
 | 其他海外网站 | 🚀 `Proxies` |
@@ -51,7 +53,8 @@
 
 重新打开后，按顺序核对：
 
-1. 代理页能看到 `Claude / AI / Google / YouTube / Telegram / Exchange` 与 `US / TW / SG / HK / JP / UK / Proxies` 这些策略组（地区组按订阅里的节点生成：订阅里没有某地区的节点，就不会有那个组；`US` 始终存在）。
+1. 代理页主要看到三层核心组：业务组 `AI / Google + YouTube + Telegram / Exchange`、地区组 `US / TW / SG / HK / JP / UK`、普通代理 `Proxies`（地区组按订阅里的节点生成，`US` 始终存在）。机场自带的 `PROXY / GLOBAL / 订阅更新` 等技术组如果未被 compact 压缩会保留并标记隐藏。`AI` 没有可识别的 US 节点时会只剩 `REJECT`，国际 AI 不可用；补充 US 节点后重新激活订阅。
+
 2. 打开 `claude.ai` 和 `chatgpt.com`，页面正常。
 3. 打开 `youtube.com`，视频能播放。
 4. 打开 `baidu.com`，国内网站直连正常。
@@ -65,7 +68,8 @@
 
 `Script.js` 在订阅之上做增强，不动节点：
 
-- 补齐策略组并固定地区：`Claude` = US ｜ `AI` = US / TW ｜ `Exchange` = TW / SG。
+- 代理页按“业务组 → 地区组 → 普通代理”三层组织；机场自带的技术组只保留为隐藏依赖。
+- 补齐策略组并固定地区：国际 AI（含 Claude / Codex）= US ｜ `Exchange` = TW / SG。
 - 大陆 AI 强制直连；钉钉全家桶（含会议子进程）进程级直连，防止内嵌海外 SDK 偷跑代理流量。
 - 订阅自带 `REJECT` 规则保留；引用自定义组的规则、监听器、隧道自动识别，不误删。
 

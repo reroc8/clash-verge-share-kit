@@ -9,6 +9,7 @@ const scriptPath = path.join(rootDir, "config", "Script.js");
 const mergePath = path.join(rootDir, "config", "Merge.yaml");
 const source = fs.readFileSync(scriptPath, "utf8");
 const mergeSource = fs.readFileSync(mergePath, "utf8");
+const unifiedGoogleGroup = "Google + YouTube + Telegram";
 vm.runInThisContext(source, { filename: "config/Script.js" });
 
 function run(config) {
@@ -142,8 +143,8 @@ function groupByName(config, name) {
   assert.deepStrictEqual(twGroup.proxies, ["TW"]);
   assert(!usGroup.proxies.includes(usGroup.name), "US group must not reference itself");
   assert(!twGroup.proxies.includes(twGroup.name), "TW group must not reference itself");
-  assert.deepStrictEqual(groupByName(output, "Claude").proxies, ["US Group"]);
-  assert.deepStrictEqual(groupByName(output, "AI").proxies, ["US Group", "TW Group"]);
+  assert(!groupByName(output, "Claude"), "new subscriptions must not get a second visible Claude group");
+  assert.deepStrictEqual(groupByName(output, "AI").proxies, ["US Group"]);
   assert(groupByName(output, "Proxies Group"), "Proxies node collision must allocate Proxies Group");
   assert.strictEqual(output["rule-providers"].test.proxy, "Proxies Group");
 }
@@ -233,18 +234,39 @@ function groupByName(config, name) {
       { name: "TW", type: "url-test", use: ["airport"], filter: "TW" },
       { name: "SG", type: "url-test", use: ["airport"], filter: "SG" },
       { name: "Claude", type: "select", use: ["airport"], filter: "US|HK" },
+      { name: "Google", type: "select", use: ["airport"], filter: "TW|US" },
+      { name: "YouTube", type: "select", use: ["airport"], filter: "TW|US" },
+      { name: "Telegram", type: "select", use: ["airport"], filter: "TW|US" },
       { name: "AI", type: "select", use: ["airport"], "include-all": true },
       { name: "Exchange", type: "select", use: ["airport"], "exclude-filter": "TW|SG" }
     ],
-    rules: ["MATCH,Proxies"]
+    rules: [
+      "DOMAIN-SUFFIX,claude.example,Claude",
+      "DOMAIN-SUFFIX,google.example,Google",
+      "DOMAIN-SUFFIX,youtube.example,YouTube",
+      "DOMAIN-SUFFIX,telegram.example,Telegram",
+      "MATCH,Proxies"
+    ]
   });
 
   assert.deepStrictEqual(groupByName(output, "Proxies").use, ["airport"]);
   assert.deepStrictEqual(groupByName(output, "US").use, ["airport"]);
   assert.deepStrictEqual(groupByName(output, "TW").use, ["airport"]);
   assert.deepStrictEqual(groupByName(output, "SG").use, ["airport"]);
-  assert.deepStrictEqual(groupByName(output, "Claude").proxies, ["US"]);
-  assert.deepStrictEqual(groupByName(output, "AI").proxies, ["US", "TW"]);
+  assert.deepStrictEqual(groupByName(output, "AI").proxies, ["US"]);
+  assert.strictEqual(groupByName(output, "Claude").hidden, true);
+  assert.deepStrictEqual(groupByName(output, "Claude").proxies, ["AI"]);
+  assert(output.rules.includes("DOMAIN-SUFFIX,claude.example,AI"), "legacy Claude rule targets must map to AI");
+  for (const alias of ["Google", "YouTube", "Telegram"]) {
+    assert.strictEqual(groupByName(output, alias).hidden, true, `${alias} legacy group must be hidden`);
+    assert.deepStrictEqual(groupByName(output, alias).proxies, [unifiedGoogleGroup]);
+    assert.strictEqual(groupByName(output, alias).use, undefined);
+    assert.strictEqual(groupByName(output, alias).filter, undefined);
+  }
+  assert(output.rules.includes(`DOMAIN-SUFFIX,google.example,${unifiedGoogleGroup}`), "legacy Google rule target must map to the unified group");
+  assert(output.rules.includes(`DOMAIN-SUFFIX,youtube.example,${unifiedGoogleGroup}`), "legacy YouTube rule target must map to the unified group");
+  assert(output.rules.includes(`DOMAIN-SUFFIX,telegram.example,${unifiedGoogleGroup}`), "legacy Telegram rule target must map to the unified group");
+  assert.deepStrictEqual(groupByName(output, unifiedGoogleGroup).proxies.slice(0, 3), ["TW", "SG", "US"]);
   assert.deepStrictEqual(groupByName(output, "Exchange").proxies, ["TW", "SG"]);
   assert.strictEqual(groupByName(output, "Claude").use, undefined);
   assert.strictEqual(groupByName(output, "Claude").filter, undefined);
@@ -252,6 +274,28 @@ function groupByName(config, name) {
   assert.strictEqual(groupByName(output, "AI")["include-all"], undefined);
   assert.strictEqual(groupByName(output, "Exchange").use, undefined);
   assert.strictEqual(groupByName(output, "Exchange")["exclude-filter"], undefined);
+}
+
+// 机场技术组保留给原始规则使用，但不应和三层核心组一起占据代理页入口。
+// 普通自定义组仍然可见，避免把用户自己的策略入口误判为技术组。
+{
+  const output = run({
+    proxies: [{ name: "US-A" }, { name: "TW-A" }],
+    "proxy-groups": [
+      { name: "PROXY", type: "select", proxies: ["US-A", "TW-A"] },
+      { name: "GLOBAL", type: "select", proxies: ["PROXY", "DIRECT"] },
+      { name: "订阅更新", type: "fallback", proxies: ["PROXY", "DIRECT"] },
+      { name: "我的备用", type: "select", proxies: ["US-A"] }
+    ],
+    rules: ["MATCH,PROXY"]
+  });
+
+  for (const name of ["PROXY", "GLOBAL", "订阅更新"]) {
+    assert.strictEqual(groupByName(output, name).hidden, true, `${name} technical group must be hidden`);
+  }
+  assert.strictEqual(groupByName(output, "Proxies").hidden, undefined, "managed Proxies group must remain visible");
+  assert.strictEqual(groupByName(output, "我的备用").hidden, undefined, "ordinary custom groups must remain visible");
+  assert(output.rules.includes("MATCH,PROXY"), "hidden technical group must remain a valid rule target");
 }
 
 {
@@ -331,27 +375,41 @@ function groupByName(config, name) {
 
 {
   const requiredBusinessRules = [
-    "DOMAIN,anthropic.auth0.com,Claude",
-    "DOMAIN,anthropic-com.ghost.io,Claude",
-    "DOMAIN,anthropic.com.cdn.cloudflare.net,Claude",
-    "DOMAIN-SUFFIX,clau.de,Claude",
-    "DOMAIN-SUFFIX,claudeusercontent.com,Claude",
+    "DOMAIN,anthropic.auth0.com,AI",
+    "DOMAIN,anthropic-com.ghost.io,AI",
+    "DOMAIN,anthropic.com.cdn.cloudflare.net,AI",
+    "DOMAIN-SUFFIX,clau.de,AI",
+    "DOMAIN-SUFFIX,claudeusercontent.com,AI",
     "DOMAIN,openaiassets.blob.core.windows.net,AI",
-    "DOMAIN,notebooklm.googleapis.com,AI",
-    "DOMAIN-SUFFIX,gemini.gstatic.com,AI",
-    "DOMAIN-SUFFIX,generativeai.google,AI",
+    `DOMAIN,notebooklm.googleapis.com,${unifiedGoogleGroup}`,
+    `DOMAIN-SUFFIX,gemini.gstatic.com,${unifiedGoogleGroup}`,
+    `DOMAIN-SUFFIX,generativeai.google,${unifiedGoogleGroup}`,
     "DOMAIN-SUFFIX,tgalileo.com,Proxies",
     "DOMAIN-SUFFIX,lexmount.com,US",
     "DOMAIN-SUFFIX,wjkc.xyz,TW",
-    "PROCESS-NAME-REGEX,(?i)^muse,US",
-    "DOMAIN-SUFFIX,muse.meta.com,US",
-    "DOMAIN-SUFFIX,muse.ai,US",
+    "PROCESS-NAME-REGEX,(?i)^muse,AI",
+    "DOMAIN-SUFFIX,muse.meta.com,AI",
+    "DOMAIN-SUFFIX,muse.ai,AI",
     "DOMAIN-SUFFIX,dola.com,SG",
-    "DOMAIN-SUFFIX,priceai.cc,Google",
-    "DOMAIN-SUFFIX,982xj.xyz,Google"
+    `DOMAIN-SUFFIX,priceai.cc,${unifiedGoogleGroup}`,
+    `DOMAIN-SUFFIX,982xj.xyz,${unifiedGoogleGroup}`,
+    "DOMAIN-SUFFIX,featuregates.org,AI",
+    "DOMAIN-SUFFIX,featureassets.org,AI",
+    "DOMAIN-SUFFIX,statsigapi.net,AI",
+    "DOMAIN-SUFFIX,statsig.com,AI"
   ];
   for (const rule of requiredBusinessRules) {
     assert(mergeSource.includes(`- ${rule}`), `${rule} must remain in Merge.yaml`);
+  }
+  for (const rulePrefix of [
+    "- DOMAIN-SUFFIX,gemini.google.com",
+    "- DOMAIN-SUFFIX,notebooklm.google.com",
+    "- DOMAIN,notebooklm.googleapis.com",
+    "- DOMAIN-SUFFIX,gemini.gstatic.com"
+  ]) {
+    const rule = `${rulePrefix},${unifiedGoogleGroup}`;
+    assert(mergeSource.includes(rule), `${rule} must remain on the unified Google/YouTube/Telegram group`);
+    assert(!mergeSource.includes(`${rulePrefix},AI`), `${rule} must not regress to the US-only AI group`);
   }
 
   const applicationsIndex = mergeSource.indexOf("- RULE-SET,applications,DIRECT");
@@ -360,6 +418,46 @@ function groupByName(config, name) {
   assert(applicationsIndex > 0, "applications rule must exist");
   assert(applicationsIndex < cnDomainIndex, "applications must run before the domestic base layer");
   assert(applicationsIndex < globalDomainIndex, "applications must run before the global base layer");
+
+  // AI 专属功能开关与 Statsig 域名必须在通用规则集之前，否则会被国内直连或普通海外规则抢先命中。
+  const aiCompanionRules = [
+    "- DOMAIN-SUFFIX,featuregates.org,AI",
+    "- DOMAIN-SUFFIX,featureassets.org,AI",
+    "- DOMAIN-SUFFIX,statsigapi.net,AI",
+    "- DOMAIN-SUFFIX,statsig.com,AI"
+  ];
+  for (const companionRule of aiCompanionRules) {
+    const companionIndex = mergeSource.indexOf(companionRule);
+    assert(companionIndex > 0, `${companionRule} must exist in Merge.yaml`);
+    assert(companionIndex < applicationsIndex, `${companionRule} must precede applications`);
+    assert(companionIndex < cnDomainIndex, `${companionRule} must precede cn-domain`);
+    assert(companionIndex < globalDomainIndex, `${companionRule} must precede global-domain`);
+  }
+  for (const sharedRule of [
+    "- DOMAIN-SUFFIX,hcaptcha.com,AI",
+    "- DOMAIN-SUFFIX,challenges.cloudflare.com,AI",
+    "- DOMAIN-SUFFIX,stripe.com,AI",
+    "- DOMAIN-SUFFIX,stripe.network,AI"
+  ]) {
+    assert(!mergeSource.includes(sharedRule), `${sharedRule} must not force shared traffic into the US-only AI group`);
+  }
+
+  // 只限制 OpenAI/ChatGPT 的 UDP/443；不能把对方配置的全局 QUIC/STUN 拒绝策略带进基础包。
+  const aiQuicRules = [
+    "- AND,((NETWORK,udp),(DST-PORT,443),(DOMAIN-SUFFIX,oaiusercontent.com)),REJECT",
+    "- AND,((NETWORK,udp),(DST-PORT,443),(DOMAIN-SUFFIX,oaistatic.com)),REJECT",
+    "- AND,((NETWORK,udp),(DST-PORT,443),(DOMAIN-SUFFIX,openai.com)),REJECT",
+    "- AND,((NETWORK,udp),(DST-PORT,443),(DOMAIN-SUFFIX,chatgpt.com)),REJECT"
+  ];
+  const aiDomainIndex = mergeSource.indexOf("- DOMAIN-SUFFIX,chatgpt.com,AI");
+  assert(aiDomainIndex > 0, "ChatGPT AI route must exist");
+  for (const quicRule of aiQuicRules) {
+    const quicIndex = mergeSource.indexOf(quicRule);
+    assert(quicIndex > 0, `${quicRule} must exist in Merge.yaml`);
+    assert(quicIndex < aiDomainIndex, `${quicRule} must precede the AI domain routes`);
+  }
+  assert(!mergeSource.includes("- AND,((NETWORK,udp),(DST-PORT,443)),REJECT"), "global UDP/443 reject must stay out of the conservative AI layer");
+  assert(!mergeSource.includes("- DOMAIN-KEYWORD,stun,REJECT"), "global STUN reject must stay out of the conservative AI layer");
 
   // tgalileo.com 唯一会被 cn-domain（+.tgalileo.com）劫持成 DIRECT，位次是这条规则生效的唯一前提，
   // 所以只断言"规则存在"不够：必须同时盯住位次。applications / global-domain 实测不含该域，
@@ -385,12 +483,12 @@ function groupByName(config, name) {
   const directedExitRules = [
     "- DOMAIN-SUFFIX,lexmount.com,US",
     "- DOMAIN-SUFFIX,wjkc.xyz,TW",
-    "- PROCESS-NAME-REGEX,(?i)^muse,US",
-    "- DOMAIN-SUFFIX,muse.meta.com,US",
-    "- DOMAIN-SUFFIX,muse.ai,US",
+    "- PROCESS-NAME-REGEX,(?i)^muse,AI",
+    "- DOMAIN-SUFFIX,muse.meta.com,AI",
+    "- DOMAIN-SUFFIX,muse.ai,AI",
     "- DOMAIN-SUFFIX,dola.com,SG",
-    "- DOMAIN-SUFFIX,priceai.cc,Google",
-    "- DOMAIN-SUFFIX,982xj.xyz,Google"
+    `- DOMAIN-SUFFIX,priceai.cc,${unifiedGoogleGroup}`,
+    `- DOMAIN-SUFFIX,982xj.xyz,${unifiedGoogleGroup}`
   ];
   for (const directedRule of directedExitRules) {
     const directedIndex = mergeSource.indexOf(directedRule);
@@ -410,11 +508,11 @@ function groupByName(config, name) {
   }
   for (const domain of ["t.me", "telegra.ph", "telegram-cdn.org", "telegram.org", "telesco.pe"]) {
     assert(
-      mergeSource.includes(`- DOMAIN-SUFFIX,${domain},Telegram`),
-      `${domain} must use the Telegram group`
+      mergeSource.includes(`- DOMAIN-SUFFIX,${domain},${unifiedGoogleGroup}`),
+      `${domain} must use the unified Google/YouTube/Telegram group`
     );
   }
-  assert(mergeSource.includes("- RULE-SET,telegramcidr,Telegram,no-resolve"), "existing Telegram CIDR routing must remain enabled");
+  assert(mergeSource.includes(`- RULE-SET,telegramcidr,${unifiedGoogleGroup},no-resolve`), "existing Telegram CIDR routing must remain enabled");
 }
 
 {
@@ -557,6 +655,16 @@ function groupByName(config, name) {
       rules: ["MATCH,DIRECT"]
     });
     assert(groupByName(output, "Custom"), "listeners proxy reference must keep original groups");
+  }
+  {
+    const output = run({
+      proxies: [{ name: "US-A" }, { name: "TW-A" }],
+      "proxy-groups": [{ name: "Google", type: "select", proxies: ["TW-A"] }],
+      listeners: [{ type: "socks", port: 7892, proxy: "Google" }],
+      rules: ["MATCH,DIRECT"]
+    });
+    assert(groupByName(output, "Google"), "legacy managed listener alias must survive compact mode");
+    assert.strictEqual(output.listeners[0].proxy, "Google", "legacy listener alias must keep its target name");
   }
   {
     const output = run({
@@ -719,6 +827,25 @@ if (process.env.MIHOMO_BIN) {
       }
     },
     {
+      name: "provider aliases do not create a proxy-group loop",
+      config: {
+        "proxy-providers": {
+          airport: {
+            type: "inline",
+            payload: [httpProxy("US-A", 18088), httpProxy("TW-A", 18089)]
+          }
+        },
+        "proxy-groups": [
+          { name: "US", type: "url-test", use: ["airport"], filter: "US" },
+          { name: "TW", type: "url-test", use: ["airport"], filter: "TW" },
+          { name: "Google", type: "select", use: ["airport"], filter: "TW|US" },
+          { name: "YouTube", type: "select", use: ["airport"], filter: "TW|US" },
+          { name: "Telegram", type: "select", use: ["airport"], filter: "TW|US" }
+        ],
+        rules: ["MATCH,DIRECT"]
+      }
+    },
+    {
       name: "merge rules with a subscription that has SG/TW nodes",
       config: {
         proxies: [httpProxy("新加坡 01", 18084), httpProxy("台湾 01", 18085)],
@@ -783,7 +910,7 @@ if (process.env.MIHOMO_BIN) {
 
 {
   // 机场直接用 IATA 三字码命名节点（HKG-01 / LAX-02 / NRT-03 …）：
-  // 不识别的话这些节点不会进地区组，Claude/AI/Exchange 会整体退化成 REJECT。
+  // 不识别的话这些节点不会进地区组，AI/Exchange 会整体退化成 REJECT。
   const output = run({
     proxies: [
       { name: "HKG-01" },
@@ -858,19 +985,21 @@ if (process.env.MIHOMO_BIN) {
     rules: ["MATCH,DIRECT"]
   });
 
-  for (const name of ["Google", "YouTube", "Telegram"]) {
-    const grp = groupByName(output, name);
-    assert(grp, `${name} 组必须生成`);
-    assert.notStrictEqual(
-      grp.proxies[0],
-      "Proxies",
-      `${name} 组的首选必须是地区组，不能是兜底组 Proxies（否则默认行为退化为跟随兜底）`
-    );
-    assert(
-      grp.proxies.includes("Proxies"),
-      `${name} 组仍应保留 Proxies 选项（排在后面），以便需要时跟随全局`
-    );
-  }
+  const grp = groupByName(output, unifiedGoogleGroup);
+  assert(grp, "Google + YouTube + Telegram 组必须生成");
+  assert(!groupByName(output, "Google"), "新配置不应再生成独立 Google 组");
+  assert(!groupByName(output, "YouTube"), "新配置不应再生成独立 YouTube 组");
+  assert(!groupByName(output, "Telegram"), "新配置不应再生成独立 Telegram 组");
+  assert.strictEqual(grp.proxies[0], "TW", "统一业务组有台湾节点时必须默认选择 TW");
+  assert.notStrictEqual(
+    grp.proxies[0],
+    "Proxies",
+    "统一业务组的首选必须是地区组，不能是兜底组 Proxies（否则默认行为退化为跟随兜底）"
+  );
+  assert(
+    grp.proxies.includes("Proxies"),
+    "统一业务组仍应保留 Proxies 选项（排在后面），以便需要时跟随全局"
+  );
 }
 
 console.log("Script.js regression tests passed");

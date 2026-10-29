@@ -295,6 +295,7 @@ function main(config, profileName) {
     google: true,
     youtube: true,
     telegram: true,
+    "google + youtube + telegram": true,
     exchange: true,
     hk: true,
     jp: true,
@@ -515,20 +516,117 @@ function main(config, profileName) {
     managedGroups.US = ensureManagedGroup("US", [PROXIES_GROUP, "DIRECT"], ["DIRECT"]);
   }
   // 业务组统一采用「地区优先」：第一个选项是明确的地区组，Proxies（兜底组）降到最后。
-  // 这样每组的默认行为都能一句话说清（Claude→US、AI→US、Google/YouTube/Telegram→TW），
-  // 而不是「跟随 Proxies 当前选中的节点」——后者会让分组默认行为不可预期，
-  // 用户看到 Google 组也无法判断它实际走哪个地区。
-  managedGroups.Claude = ensureManagedGroup("Claude", [
+  // Claude 与 Codex / OpenAI 统一使用一个 AI 组，出口固定为 US。这样用户只需维护一个
+  // 国际 AI 出口，避免两个组被误选成不同地区，导致同一账号的会话出口拆分。
+  managedGroups.AI = ensureManagedGroup("AI", [
     detectedRegions.US ? managedGroups.US : null
   ], ["REJECT"]);
-  managedGroups.AI = ensureManagedGroup("AI", [
-    detectedRegions.US ? managedGroups.US : null,
-    detectedRegions.TW ? managedGroups.TW : null
-  ], ["REJECT"]);
-  managedGroups.Google = ensureManagedGroup("Google", [managedGroups.TW, managedGroups.US, managedGroups.HK, managedGroups.JP, managedGroups.SG, PROXIES_GROUP, "DIRECT"], ["DIRECT"]);
-  managedGroups.YouTube = ensureManagedGroup("YouTube", [managedGroups.TW, managedGroups.HK, managedGroups.JP, managedGroups.SG, managedGroups.US, PROXIES_GROUP, "DIRECT"], ["DIRECT"]);
-  managedGroups.Telegram = ensureManagedGroup("Telegram", [managedGroups.TW, managedGroups.HK, managedGroups.JP, managedGroups.SG, managedGroups.US, PROXIES_GROUP], [PROXIES_GROUP]);
+
+  // 兼容旧订阅里已有的 Claude 组：保留为隐藏别名并指向新的 AI 组，避免旧规则、
+  // provider、listener、tunnel 或 ntp 引用悬空；新配置不再生成第二个可见业务组。
+  var legacyClaudeGroup = findGroup("Claude");
+  if (legacyClaudeGroup && legacyClaudeGroup.name !== managedGroups.AI) {
+    var legacyClaudeDynamicKeys = [
+      "use",
+      "filter",
+      "exclude-filter",
+      "exclude-type",
+      "include-all",
+      "include-all-proxies",
+      "include-all-providers",
+      "url",
+      "interval",
+      "timeout",
+      "tolerance",
+      "lazy",
+      "expected-status",
+      "max-failed-times"
+    ];
+    for (var legacyClaudeKeyIndex = 0; legacyClaudeKeyIndex < legacyClaudeDynamicKeys.length; legacyClaudeKeyIndex++) {
+      delete legacyClaudeGroup[legacyClaudeDynamicKeys[legacyClaudeKeyIndex]];
+    }
+    legacyClaudeGroup.type = "select";
+    legacyClaudeGroup.proxies = [managedGroups.AI];
+    legacyClaudeGroup.hidden = true;
+  }
+  // 规则目标仍可使用 Claude 这个历史名称，但实际统一映射到 AI。
+  managedGroups.Claude = managedGroups.AI;
+
+  // Google 账号、YouTube 和 Telegram 共用同一个默认 TW 的日常海外出口，
+  // 避免同一 Google 账号在 Google 与 YouTube 之间选出不同地区。
+  var unifiedGoogleMediaGroup = "Google + YouTube + Telegram";
+  managedGroups.GoogleYouTubeTelegram = ensureManagedGroup(unifiedGoogleMediaGroup, [
+    managedGroups.TW,
+    managedGroups.HK,
+    managedGroups.JP,
+    managedGroups.SG,
+    managedGroups.US,
+    PROXIES_GROUP,
+    "DIRECT"
+  ], ["DIRECT"]);
+
+  function hideManagedAlias(aliasName, targetName) {
+    var aliasGroup = findGroup(aliasName);
+    if (!aliasGroup || aliasGroup.name === targetName) {
+      return;
+    }
+    var legacyAliasDynamicKeys = [
+      "use",
+      "filter",
+      "exclude-filter",
+      "exclude-type",
+      "include-all",
+      "include-all-proxies",
+      "include-all-providers",
+      "url",
+      "interval",
+      "timeout",
+      "tolerance",
+      "lazy",
+      "expected-status",
+      "max-failed-times"
+    ];
+    for (var legacyAliasKeyIndex = 0; legacyAliasKeyIndex < legacyAliasDynamicKeys.length; legacyAliasKeyIndex++) {
+      delete aliasGroup[legacyAliasDynamicKeys[legacyAliasKeyIndex]];
+    }
+    aliasGroup.type = "select";
+    aliasGroup.proxies = [targetName];
+    aliasGroup.hidden = true;
+  }
+
+  // 旧订阅里的三个业务组保留为隐藏别名，避免旧规则、provider、listener、
+  // tunnel 或 ntp 引用悬空；新配置只显示统一业务组。
+  hideManagedAlias("Google", managedGroups.GoogleYouTubeTelegram);
+  hideManagedAlias("YouTube", managedGroups.GoogleYouTubeTelegram);
+  hideManagedAlias("Telegram", managedGroups.GoogleYouTubeTelegram);
+  managedGroups.Google = managedGroups.GoogleYouTubeTelegram;
+  managedGroups.YouTube = managedGroups.GoogleYouTubeTelegram;
+  managedGroups.Telegram = managedGroups.GoogleYouTubeTelegram;
   managedGroups.Exchange = ensureManagedGroup("Exchange", [managedGroups.TW, managedGroups.SG], ["REJECT"]);
+
+  // Proxies 可能是在统一业务组建立前由原始组名生成的；旧别名再指向统一组、
+  // 统一组又指向 Proxies 时会形成 mihomo 环。移除会回到 Proxies 的受管组边，
+  // 保留别名自身指向统一组的兼容语义。
+  var generatedProxiesGroup = findGroup(PROXIES_GROUP);
+  if (generatedProxiesGroup && Array.isArray(generatedProxiesGroup.proxies)) {
+    var proxyGroupCycleNames = createNameMap();
+    proxyGroupCycleNames[normalizeName(managedGroups.GoogleYouTubeTelegram)] = true;
+    var proxyGroupCycleAliases = ["Claude", "Google", "YouTube", "Telegram"];
+    for (var cycleAliasIndex = 0; cycleAliasIndex < proxyGroupCycleAliases.length; cycleAliasIndex++) {
+      var cycleAliasGroup = findGroup(proxyGroupCycleAliases[cycleAliasIndex]);
+      if (cycleAliasGroup) {
+        proxyGroupCycleNames[normalizeName(cycleAliasGroup.name)] = true;
+      }
+    }
+    var safeProxyOptions = [];
+    for (var proxyOptionIndex = 0; proxyOptionIndex < generatedProxiesGroup.proxies.length; proxyOptionIndex++) {
+      var proxyOption = generatedProxiesGroup.proxies[proxyOptionIndex];
+      if (!proxyGroupCycleNames[normalizeName(proxyOption)]) {
+        safeProxyOptions.push(proxyOption);
+      }
+    }
+    generatedProxiesGroup.proxies = safeProxyOptions.length > 0 ? unique(safeProxyOptions) : ["DIRECT"];
+  }
 
   var managedTargetMap = createNameMap();
   for (var managedName in managedGroups) {
@@ -561,6 +659,15 @@ function main(config, profileName) {
         keepGroupNames[managedTargetMap[keepName]] = true;
       }
     }
+    // 旧订阅的受管别名可能仍被 listener / tunnel / ntp 引用；这些名称
+    // 不属于 originalCustomGroupNames，不能靠关闭压缩来保留，需显式留下。
+    var legacyManagedAliases = ["Claude", "Google", "YouTube", "Telegram"];
+    for (var legacyAliasIndex = 0; legacyAliasIndex < legacyManagedAliases.length; legacyAliasIndex++) {
+      var legacyAliasGroup = findGroup(legacyManagedAliases[legacyAliasIndex]);
+      if (legacyAliasGroup) {
+        keepGroupNames[legacyAliasGroup.name] = true;
+      }
+    }
 
     var compactGroups = [];
     var compactSeen = createNameMap();
@@ -575,11 +682,8 @@ function main(config, profileName) {
   }
 
   var displayGroupOrder = [
-    managedGroups.Claude,
     managedGroups.AI,
-    managedGroups.Google,
-    managedGroups.YouTube,
-    managedGroups.Telegram,
+    managedGroups.GoogleYouTubeTelegram,
     managedGroups.Exchange,
     managedGroups.US,
     managedGroups.TW,
@@ -613,6 +717,33 @@ function main(config, profileName) {
     }
   }
   groups = orderedGroups;
+
+  // 三层显示模型：业务组、地区组、普通代理 Proxies。机场常见的
+  // PROXY / GLOBAL / 订阅更新等是实现细节，保留它们让原始规则继续工作，
+  // 但隐藏在代理页，不与核心组并列显示。未命中这些精确名称的自定义组不动，
+  // 避免把用户自己的策略入口误判成技术组。
+  var technicalGroupPatterns = [
+    /^(global|global proxy|proxy|proxies|proxy select|auto|fallback)$/i,
+    /^(节点选择|代理|代理选择|手动切换|自动选择|故障转移)$/,
+    /^(订阅更新|更新订阅|订阅检测|subscription update|subscription check)$/i
+  ];
+
+  function isTechnicalGroupName(name) {
+    var groupName = String(name || "").trim();
+    for (var patternIndex = 0; patternIndex < technicalGroupPatterns.length; patternIndex++) {
+      if (technicalGroupPatterns[patternIndex].test(groupName)) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  for (var hiddenGroupIndex = 0; hiddenGroupIndex < groups.length; hiddenGroupIndex++) {
+    var hiddenGroup = groups[hiddenGroupIndex];
+    if (hiddenGroup && hiddenGroup.name !== PROXIES_GROUP && isTechnicalGroupName(hiddenGroup.name)) {
+      hiddenGroup.hidden = true;
+    }
+  }
 
   config["proxy-groups"] = groups;
 

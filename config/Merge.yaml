@@ -95,7 +95,7 @@ rules:
   - RULE-SET,private-ip,DIRECT,no-resolve
   # 钉钉进程级强制直连：置于所有业务精确规则之前，钉钉全家桶（DingTalk、
   # DingMeeting 等）的任何连接都不会被后面的精确域名/规则集抢先送进代理。
-  # 已知取舍：钉钉内置浏览器打开 Claude/AI 等需代理站点时同样直连（无法加载）。
+  # 已知取舍：钉钉内置浏览器打开 AI 等需代理站点时同样直连（无法加载）。
   - PROCESS-NAME-REGEX,(?i)ding(talk|meeting),DIRECT
   # WorkBuddy AI 国际版海外遥测：sg.tgalileo.com 解析到腾讯云新加坡（43.156.86.0/24），
   # 但该域在 cn-domain 规则集里（+.tgalileo.com），按常规会被判为国内直连。前置精确
@@ -110,13 +110,13 @@ rules:
   # 该域不在任何规则集内，默认落兜底 DIRECT，国内直连 Cloudflare 常被干扰限速（实测 2–15 秒波动）。
   # 前置精确规则改走代理，并固定到台湾组 —— 目标写地区组名而非兜底组，出口可预期。
   - DOMAIN-SUFFIX,wjkc.xyz,TW
-  # Meta Muse（个人 AI 代理，2026-09 起仅北美开放）与 muse.ai：需美区出口。
+  # Meta Muse（个人 AI 代理，2026-09 起仅北美开放）与 muse.ai：进入统一 US-only 的 AI 组。
   # Muse 桌面版实际连的是 graph.facebook.com 等 Meta 域名（走 global-domain 规则集），
   # 按域名无法与服务区分，故用进程名匹配（前缀匹配，以覆盖可能存在的 helper 子进程）；
   # muse.meta.com 为网页版入口。
-  - PROCESS-NAME-REGEX,(?i)^muse,US
-  - DOMAIN-SUFFIX,muse.meta.com,US
-  - DOMAIN-SUFFIX,muse.ai,US
+  - PROCESS-NAME-REGEX,(?i)^muse,AI
+  - DOMAIN-SUFFIX,muse.meta.com,AI
+  - DOMAIN-SUFFIX,muse.ai,AI
   # Dola（字节豆包海外版，dola.com）：区域锁定，US / CA / AU / 中国大陆均不可用，
   # 主力市场为东南亚与英国。用 SG 地区组，禁用 US 组。
   - DOMAIN-SUFFIX,dola.com,SG
@@ -124,34 +124,41 @@ rules:
   # （104.21.x / 172.67.x），不在任何规则集内，默认落兜底 MATCH,DIRECT；实测国内直连极差
   # （priceai：3 次里 2 次 5 秒超时，成功那次 TLS 5.5s、首字节 11.2s；982xj：3 次里 1 次超时，
   # 成功那次 TLS 1.2–3.1s、首字节 2.6–3.8s，CF-RAY 落 LAX；同域走台湾节点实测 38ms）。
-  # 前置精确规则改走 Google 组——该组恒存在且默认台湾出口，不会因订阅缺地区节点而降级。
-  - DOMAIN-SUFFIX,priceai.cc,Google
-  - DOMAIN-SUFFIX,982xj.xyz,Google
-  # Google account / auth / billing stay on the stable Google group
-  - DOMAIN,accounts.google.com,Google
-  - DOMAIN,myaccount.google.com,Google
-  - DOMAIN,passwords.google.com,Google
-  - DOMAIN,families.google.com,Google
-  - DOMAIN,takeout.google.com,Google
-  - DOMAIN,payments.google.com,Google
-  - DOMAIN,pay.google.com,Google
-  - DOMAIN,wallet.google.com,Google
-  - DOMAIN-SUFFIX,oauth2.googleapis.com,Google
-  - DOMAIN-SUFFIX,oauth2.googleusercontent.com,Google
-  # Claude is isolated to a US-only group
+  # 前置精确规则改走 Google + YouTube + Telegram 组——该组恒存在且默认台湾出口，不会因订阅缺地区节点而降级。
+  - DOMAIN-SUFFIX,priceai.cc,Google + YouTube + Telegram
+  - DOMAIN-SUFFIX,982xj.xyz,Google + YouTube + Telegram
+  # Google account / auth / billing share the stable Google + YouTube + Telegram group
+  - DOMAIN,accounts.google.com,Google + YouTube + Telegram
+  - DOMAIN,myaccount.google.com,Google + YouTube + Telegram
+  - DOMAIN,passwords.google.com,Google + YouTube + Telegram
+  - DOMAIN,families.google.com,Google + YouTube + Telegram
+  - DOMAIN,takeout.google.com,Google + YouTube + Telegram
+  - DOMAIN,payments.google.com,Google + YouTube + Telegram
+  - DOMAIN,pay.google.com,Google + YouTube + Telegram
+  - DOMAIN,wallet.google.com,Google + YouTube + Telegram
+  - DOMAIN-SUFFIX,oauth2.googleapis.com,Google + YouTube + Telegram
+  - DOMAIN-SUFFIX,oauth2.googleusercontent.com,Google + YouTube + Telegram
+  # OpenAI / ChatGPT 的 QUIC 回落：仅拒绝这些 AI 域名的 UDP/443，
+  # 让客户端回到 TCP，避免节点或上游对 QUIC 支持不完整时卡在连接阶段。
+  # 不做全局 UDP/443 拒绝，避免影响会议、游戏和其它 HTTP/3 流量。
+  - AND,((NETWORK,udp),(DST-PORT,443),(DOMAIN-SUFFIX,oaiusercontent.com)),REJECT
+  - AND,((NETWORK,udp),(DST-PORT,443),(DOMAIN-SUFFIX,oaistatic.com)),REJECT
+  - AND,((NETWORK,udp),(DST-PORT,443),(DOMAIN-SUFFIX,openai.com)),REJECT
+  - AND,((NETWORK,udp),(DST-PORT,443),(DOMAIN-SUFFIX,chatgpt.com)),REJECT
+  # Claude / Anthropic shares the unified US-only AI group with Codex and OpenAI.
   # Shared Auth0 / Ghost / Cloudflare suffixes are intentionally not used.
-  - DOMAIN,anthropic.auth0.com,Claude
-  - DOMAIN,anthropic-com.ghost.io,Claude
-  - DOMAIN,anthropic.com.cdn.cloudflare.net,Claude
-  - DOMAIN,servd-anthropic-website.b-cdn.net,Claude
-  - DOMAIN-SUFFIX,clau.de,Claude
-  - DOMAIN-SUFFIX,claude.ai,Claude
-  - DOMAIN-SUFFIX,claude.com,Claude
-  - DOMAIN-SUFFIX,claudemcpclient.com,Claude
-  - DOMAIN-SUFFIX,claudemcpcontent.com,Claude
-  - DOMAIN-SUFFIX,claudeusercontent.com,Claude
-  - DOMAIN-SUFFIX,anthropic.com,Claude
-  # International AI services use a controlled AI group with only US / TW options
+  - DOMAIN,anthropic.auth0.com,AI
+  - DOMAIN,anthropic-com.ghost.io,AI
+  - DOMAIN,anthropic.com.cdn.cloudflare.net,AI
+  - DOMAIN,servd-anthropic-website.b-cdn.net,AI
+  - DOMAIN-SUFFIX,clau.de,AI
+  - DOMAIN-SUFFIX,claude.ai,AI
+  - DOMAIN-SUFFIX,claude.com,AI
+  - DOMAIN-SUFFIX,claudemcpclient.com,AI
+  - DOMAIN-SUFFIX,claudemcpcontent.com,AI
+  - DOMAIN-SUFFIX,claudeusercontent.com,AI
+  - DOMAIN-SUFFIX,anthropic.com,AI
+  # International AI services use the unified US-only AI group.
   - DOMAIN-SUFFIX,chatgpt.com,AI
   - DOMAIN-SUFFIX,openai.com,AI
   - DOMAIN-SUFFIX,oaistatic.com,AI
@@ -159,8 +166,8 @@ rules:
   - DOMAIN-SUFFIX,oaistatsig.com,AI
   - DOMAIN-SUFFIX,openaimerge.com,AI
   - DOMAIN-SUFFIX,openaiapi-site.azureedge.net,AI
-  # Codex / OpenAI dedicated CDN and storage endpoints. Shared services such as
-  # auth0.com and stripe.com stay out of this list to avoid hijacking other apps.
+  # Codex / OpenAI dedicated CDN and storage endpoints. Shared auth0.com and
+  # Stripe stay out of this dedicated AI list.
   - DOMAIN,openai-api.arkoselabs.com,AI
   - DOMAIN,openaiassets.blob.core.windows.net,AI
   - DOMAIN,openaicom-api-bdcpf8c6d2e9atf6.z01.azurefd.net,AI
@@ -170,46 +177,47 @@ rules:
   - DOMAIN-SUFFIX,chatgpt.livekit.cloud,AI
   - DOMAIN-SUFFIX,openaicom.imgix.net,AI
   - DOMAIN-SUFFIX,openai.com.cdn.cloudflare.net,AI
-  - DOMAIN-SUFFIX,gemini.google.com,AI
-  - DOMAIN-SUFFIX,bard.google.com,AI
-  - DOMAIN-SUFFIX,generativelanguage.googleapis.com,AI
-  - DOMAIN-SUFFIX,ai.google.dev,AI
-  - DOMAIN-SUFFIX,aistudio.google.com,AI
-  - DOMAIN-SUFFIX,makersuite.google.com,AI
-  - DOMAIN-SUFFIX,notebooklm.google.com,AI
-  - DOMAIN-SUFFIX,labs.google,AI
-  - DOMAIN-SUFFIX,deepmind.com,AI
+  # Gemini / Google AI follows the unified Google + YouTube + Telegram group (default TW), not the US-only AI group.
+  - DOMAIN-SUFFIX,gemini.google.com,Google + YouTube + Telegram
+  - DOMAIN-SUFFIX,bard.google.com,Google + YouTube + Telegram
+  - DOMAIN-SUFFIX,generativelanguage.googleapis.com,Google + YouTube + Telegram
+  - DOMAIN-SUFFIX,ai.google.dev,Google + YouTube + Telegram
+  - DOMAIN-SUFFIX,aistudio.google.com,Google + YouTube + Telegram
+  - DOMAIN-SUFFIX,makersuite.google.com,Google + YouTube + Telegram
+  - DOMAIN-SUFFIX,notebooklm.google.com,Google + YouTube + Telegram
+  - DOMAIN-SUFFIX,labs.google,Google + YouTube + Telegram
+  - DOMAIN-SUFFIX,deepmind.com,Google + YouTube + Telegram
   # Gemini / Google AI endpoints are kept explicit. Do not route broad shared
-  # domains such as apis.google.com through AI because Gmail also uses them.
-  - DOMAIN,alkalicore-pa.clients6.google.com,AI
-  - DOMAIN,alkalimakersuite-pa.clients6.google.com,AI
-  - DOMAIN,antigravity-pa.googleapis.com,AI
-  - DOMAIN,antigravity.googleapis.com,AI
-  - DOMAIN,cloudaicompanion.googleapis.com,AI
-  - DOMAIN,cloudcode-pa.googleapis.com,AI
-  - DOMAIN,daily-cloudcode-pa.googleapis.com,AI
-  - DOMAIN,notebooklm-pa.googleapis.com,AI
-  - DOMAIN,notebooklm.googleapis.com,AI
-  - DOMAIN,webchannel-alkalimakersuite-pa.clients6.google.com,AI
-  - DOMAIN-SUFFIX,aicode.googleapis.com,AI
-  - DOMAIN-SUFFIX,aida.googleapis.com,AI
-  - DOMAIN-SUFFIX,aisandbox-pa.googleapis.com,AI
-  - DOMAIN-SUFFIX,antigravity-unleash.goog,AI
-  - DOMAIN-SUFFIX,antigravity.google,AI
-  - DOMAIN-SUFFIX,deepmind.google,AI
-  - DOMAIN-SUFFIX,gemini.google,AI
-  - DOMAIN-SUFFIX,gemini.gstatic.com,AI
-  - DOMAIN-SUFFIX,generativeai.google,AI
-  - DOMAIN-SUFFIX,geller-pa.googleapis.com,AI
-  - DOMAIN-SUFFIX,jules.google,AI
-  - DOMAIN-SUFFIX,jules.google.com,AI
-  - DOMAIN-SUFFIX,labs.google.com,AI
-  - DOMAIN-SUFFIX,notebooklm.google,AI
-  - DOMAIN-SUFFIX,opal.google,AI
-  - DOMAIN-SUFFIX,opal.google.com,AI
-  - DOMAIN-SUFFIX,proactivebackend-pa.googleapis.com,AI
-  - DOMAIN-SUFFIX,robinfrontend-pa.googleapis.com,AI
-  - DOMAIN-SUFFIX,stitch.withgoogle.com,AI
+  # domains such as apis.google.com through Google because Gmail also uses them.
+  - DOMAIN,alkalicore-pa.clients6.google.com,Google + YouTube + Telegram
+  - DOMAIN,alkalimakersuite-pa.clients6.google.com,Google + YouTube + Telegram
+  - DOMAIN,antigravity-pa.googleapis.com,Google + YouTube + Telegram
+  - DOMAIN,antigravity.googleapis.com,Google + YouTube + Telegram
+  - DOMAIN,cloudaicompanion.googleapis.com,Google + YouTube + Telegram
+  - DOMAIN,cloudcode-pa.googleapis.com,Google + YouTube + Telegram
+  - DOMAIN,daily-cloudcode-pa.googleapis.com,Google + YouTube + Telegram
+  - DOMAIN,notebooklm-pa.googleapis.com,Google + YouTube + Telegram
+  - DOMAIN,notebooklm.googleapis.com,Google + YouTube + Telegram
+  - DOMAIN,webchannel-alkalimakersuite-pa.clients6.google.com,Google + YouTube + Telegram
+  - DOMAIN-SUFFIX,aicode.googleapis.com,Google + YouTube + Telegram
+  - DOMAIN-SUFFIX,aida.googleapis.com,Google + YouTube + Telegram
+  - DOMAIN-SUFFIX,aisandbox-pa.googleapis.com,Google + YouTube + Telegram
+  - DOMAIN-SUFFIX,antigravity-unleash.goog,Google + YouTube + Telegram
+  - DOMAIN-SUFFIX,antigravity.google,Google + YouTube + Telegram
+  - DOMAIN-SUFFIX,deepmind.google,Google + YouTube + Telegram
+  - DOMAIN-SUFFIX,gemini.google,Google + YouTube + Telegram
+  - DOMAIN-SUFFIX,gemini.gstatic.com,Google + YouTube + Telegram
+  - DOMAIN-SUFFIX,generativeai.google,Google + YouTube + Telegram
+  - DOMAIN-SUFFIX,geller-pa.googleapis.com,Google + YouTube + Telegram
+  - DOMAIN-SUFFIX,jules.google,Google + YouTube + Telegram
+  - DOMAIN-SUFFIX,jules.google.com,Google + YouTube + Telegram
+  - DOMAIN-SUFFIX,labs.google.com,Google + YouTube + Telegram
+  - DOMAIN-SUFFIX,notebooklm.google,Google + YouTube + Telegram
+  - DOMAIN-SUFFIX,opal.google,Google + YouTube + Telegram
+  - DOMAIN-SUFFIX,opal.google.com,Google + YouTube + Telegram
+  - DOMAIN-SUFFIX,proactivebackend-pa.googleapis.com,Google + YouTube + Telegram
+  - DOMAIN-SUFFIX,robinfrontend-pa.googleapis.com,Google + YouTube + Telegram
+  - DOMAIN-SUFFIX,stitch.withgoogle.com,Google + YouTube + Telegram
   - DOMAIN-SUFFIX,perplexity.ai,AI
   - DOMAIN-SUFFIX,pplx.ai,AI
   - DOMAIN-SUFFIX,poe.com,AI
@@ -249,6 +257,13 @@ rules:
   - DOMAIN-SUFFIX,sdk.vercel.ai,AI
   - DOMAIN-SUFFIX,together.ai,AI
   - DOMAIN-SUFFIX,together.xyz,AI
+  # AI 专属功能开关、Feature Assets 和 Statsig 配套域名进入 AI 组，
+  # 默认与 AI 主站使用 US 出口。hCaptcha、Cloudflare challenge、Stripe
+  # 同时服务大量非 AI 站点，沿用通用规则，不固定到 US-only 的 AI 组。
+  - DOMAIN-SUFFIX,featuregates.org,AI
+  - DOMAIN-SUFFIX,featureassets.org,AI
+  - DOMAIN-SUFFIX,statsigapi.net,AI
+  - DOMAIN-SUFFIX,statsig.com,AI
   # Mainland China AI services should stay DIRECT, not use the international AI group.
   # Some use .com / .ai / .chat domains, so keep them before the broad global rules.
   - DOMAIN-SUFFIX,deepseek.com,DIRECT
@@ -308,33 +323,35 @@ rules:
   - RULE-SET,icloud,DIRECT
   # 用户自定义：mail.com 强制走美国
   - DOMAIN-SUFFIX,mail.com,US
+  # Google 账号、YouTube 和 Telegram 共用统一的默认 TW 业务组，
+  # 保持同一 Google 账号在 Google 与 YouTube 之间的出口地区一致。
   # YouTube
-  - DOMAIN-SUFFIX,youtube.com,YouTube
-  - DOMAIN-SUFFIX,youtu.be,YouTube
-  - DOMAIN-SUFFIX,youtube-nocookie.com,YouTube
-  - DOMAIN-SUFFIX,youtubeeducation.com,YouTube
-  - DOMAIN-SUFFIX,youtubegaming.com,YouTube
-  - DOMAIN-SUFFIX,youtubekids.com,YouTube
-  - DOMAIN-SUFFIX,googlevideo.com,YouTube
-  - DOMAIN-SUFFIX,ytimg.com,YouTube
-  - DOMAIN-SUFFIX,youtubei.googleapis.com,YouTube
-  - DOMAIN-SUFFIX,yt3.ggpht.com,YouTube
-  # Google 生态
-  - RULE-SET,google,Google
-  # Telegram domains plus the existing official IP ranges
-  - DOMAIN-SUFFIX,cdn-telegram.org,Telegram
-  - DOMAIN-SUFFIX,legra.ph,Telegram
-  - DOMAIN-SUFFIX,t.me,Telegram
-  - DOMAIN-SUFFIX,tdesktop.com,Telegram
-  - DOMAIN-SUFFIX,telegra.ph,Telegram
-  - DOMAIN-SUFFIX,telegram-cdn.org,Telegram
-  - DOMAIN-SUFFIX,telegram.dog,Telegram
-  - DOMAIN-SUFFIX,telegram.me,Telegram
-  - DOMAIN-SUFFIX,telegram.org,Telegram
-  - DOMAIN-SUFFIX,telegram.space,Telegram
-  - DOMAIN-SUFFIX,telegramdownload.com,Telegram
-  - DOMAIN-SUFFIX,telesco.pe,Telegram
-  - RULE-SET,telegramcidr,Telegram,no-resolve
+  - DOMAIN-SUFFIX,youtube.com,Google + YouTube + Telegram
+  - DOMAIN-SUFFIX,youtu.be,Google + YouTube + Telegram
+  - DOMAIN-SUFFIX,youtube-nocookie.com,Google + YouTube + Telegram
+  - DOMAIN-SUFFIX,youtubeeducation.com,Google + YouTube + Telegram
+  - DOMAIN-SUFFIX,youtubegaming.com,Google + YouTube + Telegram
+  - DOMAIN-SUFFIX,youtubekids.com,Google + YouTube + Telegram
+  - DOMAIN-SUFFIX,googlevideo.com,Google + YouTube + Telegram
+  - DOMAIN-SUFFIX,ytimg.com,Google + YouTube + Telegram
+  - DOMAIN-SUFFIX,youtubei.googleapis.com,Google + YouTube + Telegram
+  - DOMAIN-SUFFIX,yt3.ggpht.com,Google + YouTube + Telegram
+  # Google 生态（与 YouTube / Telegram 共用同一业务组）
+  - RULE-SET,google,Google + YouTube + Telegram
+  # Telegram domains plus the existing official IP ranges；与 Google / YouTube 共用同一业务组
+  - DOMAIN-SUFFIX,cdn-telegram.org,Google + YouTube + Telegram
+  - DOMAIN-SUFFIX,legra.ph,Google + YouTube + Telegram
+  - DOMAIN-SUFFIX,t.me,Google + YouTube + Telegram
+  - DOMAIN-SUFFIX,tdesktop.com,Google + YouTube + Telegram
+  - DOMAIN-SUFFIX,telegra.ph,Google + YouTube + Telegram
+  - DOMAIN-SUFFIX,telegram-cdn.org,Google + YouTube + Telegram
+  - DOMAIN-SUFFIX,telegram.dog,Google + YouTube + Telegram
+  - DOMAIN-SUFFIX,telegram.me,Google + YouTube + Telegram
+  - DOMAIN-SUFFIX,telegram.org,Google + YouTube + Telegram
+  - DOMAIN-SUFFIX,telegram.space,Google + YouTube + Telegram
+  - DOMAIN-SUFFIX,telegramdownload.com,Google + YouTube + Telegram
+  - DOMAIN-SUFFIX,telesco.pe,Google + YouTube + Telegram
+  - RULE-SET,telegramcidr,Google + YouTube + Telegram,no-resolve
   # Business rules stay first. Generic application bypass only runs before the
   # domestic/global base layers, so AI and exchange routing keep priority.
   - RULE-SET,applications,DIRECT

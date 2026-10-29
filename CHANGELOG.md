@@ -1,5 +1,15 @@
 # Changelog
 
+## v0.3.39
+
+- **重新整理分组逻辑**：代理页核心组按“业务组 → 地区组 → 普通代理”三层显示。`AI` 固定美国出口；`Google + YouTube + Telegram` 默认台湾；`Exchange` 保留台湾 / 新加坡；`Proxies` 继续作为没有专门规则流量的兜底组。
+- **合并 Google、YouTube、Telegram**：三者共用 `Google + YouTube + Telegram` 业务组，默认台湾出口；订阅自带的 `Google`、`YouTube`、`Telegram` 组改为隐藏兼容别名，机场原有技术组按实际模式保留或压缩。
+- **调整 Google AI 出口**：Gemini、NotebookLM、Google AI、相关 API 与 Google 账号配套域名跟随统一 Google 业务组，不再误走 US-only 的 `AI` 组。
+- **统一国际 AI 出口**：Claude、ChatGPT、Codex、Muse 等进入 `AI`，默认美国；补齐 AI 专属功能开关和 Statsig 配套域名，并增加 AI 专用 UDP/443 回落规则，避免 QUIC 卡住时影响首次连接。
+- **修复 provider 模式的策略组环**：订阅自带纯名 `Google` / `YouTube` / `Telegram` 组时，`Proxies` 不再经隐藏别名回指统一业务组，避免 mihomo 拒绝整份配置。
+- **规则、文档与安装提示同步**：更新 Merge 规则、README、路由说明、安装器提示和回归测试，确保配置生成后不再出现旧的可见业务组。
+- **升级提示**：这是分组与默认出口的用户可见变化。更新订阅后请重新激活；Google / YouTube / Telegram 统一从新业务组选择地区，Claude / Codex / Muse 从 `AI` 选择 US 节点。没有可识别的 US 节点时，`AI` 只保留 `REJECT`，国际 AI 不可用，需补充 US 节点后重新激活。
+
 ## v0.3.38
 
 - **监控脚本（`scripts/clash-monitor.sh`）修复一批问题**：
