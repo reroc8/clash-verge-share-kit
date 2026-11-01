@@ -53,7 +53,7 @@
 
 重新打开后，按顺序核对：
 
-1. 代理页主要看到三层核心组：业务组 `AI / Google + YouTube + Telegram / Exchange`、地区组 `US / TW / SG / HK / JP / UK`、普通代理 `Proxies`（地区组按订阅里的节点生成，`US` 始终存在）。机场自带的 `PROXY / GLOBAL / 订阅更新` 等技术组如果未被 compact 压缩会保留并标记隐藏。`AI` 没有可识别的 US 节点时会只剩 `REJECT`，国际 AI 不可用；补充 US 节点后重新激活订阅。
+1. 代理页主要看到三层核心组：业务组 `AI / Google + YouTube + Telegram / Exchange`、地区组 `US / TW / SG / HK / JP / UK`、普通代理 `Proxies`（地区组按订阅里的节点生成，`US` 始终存在）。机场自带的 `PROXY / GLOBAL / 订阅更新` 等技术组如果未被 compact 压缩会保留并标记隐藏。没有可识别的 US 节点时，`AI` 或其下面的 `US` 会只剩 `REJECT`，国际 AI 不可用；补充 US 节点后重新激活订阅。
 
 2. 打开 `claude.ai` 和 `chatgpt.com`，页面正常。
 3. 打开 `youtube.com`，视频能播放。

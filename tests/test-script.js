@@ -1,6 +1,8 @@
 const assert = require("assert");
 const childProcess = require("child_process");
 const fs = require("fs");
+const http = require("http");
+const os = require("os");
 const path = require("path");
 const vm = require("vm");
 
@@ -220,7 +222,8 @@ function groupByName(config, name) {
   assert(groupByName(output, "All Provider Nodes"), "mixed subscription must keep provider groups");
   assert(groupByName(output, "US Provider"), "mixed subscription must keep regional provider groups");
   assert(groupByName(output, "Proxies").proxies.includes("All Provider Nodes"));
-  assert(groupByName(output, "US").proxies.includes("US Provider"));
+  assert.deepStrictEqual(groupByName(output, "US").proxies, ["US-bootstrap"], "US must not trust a regional provider group by name");
+  assert.deepStrictEqual(groupByName(output, "US").use, ["airport"], "provider access must survive behind the restricted filter");
 }
 
 {
@@ -781,6 +784,154 @@ function groupByName(config, name) {
   assert(output.rules.includes("DOMAIN-SUFFIX,dola.com,SG"), "目标组存在时不得降级");
 }
 
+// Keep valid subscription inputs beside their assertions so the same fixtures also
+// run through the real kernel below. A passing JS transform alone is not enough.
+const safetyProxy = (name, extra = {}) => ({
+  name, type: "http", server: "127.0.0.1", port: 18080, ...extra
+});
+const safetyCases = [
+  {
+    name: "P1 transitive alias cycle",
+    config: {
+      proxies: [safetyProxy("US-A"), safetyProxy("TW-A")],
+      "proxy-groups": [
+        { name: "Google", type: "select", proxies: ["TW-A"] },
+        { name: "Daily", type: "select", proxies: ["Google"] },
+        { name: "Safe", type: "select", proxies: ["US-A"] }
+      ],
+      rules: ["DOMAIN,example.test,Daily", "MATCH,DIRECT"]
+    },
+    verify(output) {
+      assert(!groupByName(output, "Proxies").proxies.includes("Daily"), "P1: transitive back-edge must be removed");
+      assert(groupByName(output, "Proxies").proxies.includes("Safe"), "unrelated custom options must survive");
+      assert.deepStrictEqual(groupByName(output, "Daily").proxies, ["Google"]);
+      assert.deepStrictEqual(groupByName(output, "Google").proxies, [unifiedGoogleGroup]);
+    }
+  },
+  {
+    name: "P1 region alias cycle without a Proxies edge",
+    config: {
+      proxies: [safetyProxy("US-A"), safetyProxy("HK-A")],
+      "proxy-groups": [
+        { name: "Google", type: "select", proxies: ["HK-A"] },
+        { name: "Hong Kong Daily", type: "select", proxies: ["Google"] }
+      ],
+      rules: ["DOMAIN,example.test,Hong Kong Daily", "MATCH,DIRECT"]
+    },
+    verify(output) {
+      assert(!groupByName(output, unifiedGoogleGroup).proxies.includes("HK"), "P1: unified group must not loop through a regional alias");
+    }
+  },
+  {
+    name: "P1 removed info node references and empty group",
+    config: {
+      proxies: [safetyProxy("Traffic 100GB"), safetyProxy("US-A", { "dialer-proxy": "Traffic 100GB" })],
+      "proxy-groups": [
+        { name: "Custom", type: "select", proxies: ["Traffic 100GB", "US-A"] },
+        { name: "Info Only", type: "select", proxies: ["Traffic 100GB"] }
+      ],
+      "rule-providers": { custom: { type: "inline", behavior: "domain", payload: [], proxy: "Traffic 100GB" } },
+      "proxy-providers": { airport: { type: "inline", payload: [safetyProxy("US-remote", { "dialer-proxy": "Traffic 100GB" })] } },
+      "sub-rules": { sub: ["DOMAIN,sub.test,Traffic 100GB"] },
+      listeners: [{ name: "info-listener", type: "socks", port: 18090, proxy: "Traffic 100GB" }],
+      rules: ["DOMAIN,example.test,Custom", "DOMAIN,info.test,Info Only", "DOMAIN,target.test,Traffic 100GB", "MATCH,DIRECT"]
+    },
+    verify(output) {
+      assert.deepStrictEqual(output.proxies.map(p => p.name), ["US-A"]);
+      assert.deepStrictEqual(groupByName(output, "Custom").proxies, ["US-A"], "P1: retained groups must drop removed nodes");
+      assert.deepStrictEqual(groupByName(output, "Info Only").proxies, ["REJECT"], "P1: emptied groups must fail closed");
+      assert.strictEqual(output.proxies[0]["dialer-proxy"], "REJECT");
+      assert.strictEqual(output.listeners[0].proxy, "REJECT");
+      assert.strictEqual(output["rule-providers"].custom.proxy, "REJECT");
+      assert.strictEqual(output["proxy-providers"].airport.payload[0]["dialer-proxy"], "REJECT");
+      assert(output.rules.includes("DOMAIN,target.test,REJECT"));
+      assert.deepStrictEqual(output["sub-rules"].sub, ["DOMAIN,sub.test,REJECT"]);
+    }
+  },
+  {
+    name: "P1 restricted regions ignore mixed nested subscription groups",
+    config: {
+      proxies: [safetyProxy("US-A"), safetyProxy("HK-A"), safetyProxy("TW-A"), safetyProxy("SG-A"), safetyProxy("US HK ambiguous")],
+      "proxy-groups": [
+        { name: "US", type: "select", proxies: ["HK-A", "DIRECT", "US-A"] },
+        { name: "TW", type: "url-test", proxies: ["US", "TW-A"] },
+        { name: "SG", type: "fallback", proxies: ["DIRECT", "SG-A"] },
+        { name: "Custom", type: "select", proxies: ["US", "TW", "SG"] }
+      ],
+      rules: ["DOMAIN,example.test,Custom", "MATCH,DIRECT"]
+    },
+    verify(output) {
+      for (const region of ["US", "TW", "SG"]) {
+        assert.deepStrictEqual(groupByName(output, region).proxies, [region + "-A"], "P1: only real, unambiguous region members are allowed");
+        assert.strictEqual(groupByName(output, region).type, "select", "restricted regions must not automatically rotate nodes");
+        assert.strictEqual(groupByName(output, region)["empty-fallback"], "REJECT");
+      }
+      assert.deepStrictEqual(groupByName(output, "AI").proxies, ["US"]);
+      assert.deepStrictEqual(groupByName(output, "Exchange").proxies, ["TW", "SG"]);
+    }
+  },
+  {
+    name: "P1 misleading US group without any US node",
+    config: {
+      proxies: [safetyProxy("HK-A")],
+      "proxy-groups": [
+        { name: "US", type: "select", proxies: ["DIRECT", "HK-A"] },
+        { name: "Custom", type: "select", proxies: ["US"] }
+      ],
+      rules: ["DOMAIN,example.test,Custom", "MATCH,DIRECT"]
+    },
+    verify(output) {
+      assert.deepStrictEqual(groupByName(output, "AI").proxies, ["REJECT"], "P1: a region group name is not proof of eligible nodes");
+      assert.deepStrictEqual(groupByName(output, "US").proxies, ["REJECT"]);
+      assert.deepStrictEqual(groupByName(run(output), "AI").proxies, ["REJECT"], "reapplying the script must not reclassify an empty US group");
+    }
+  },
+  {
+    name: "P1 mixed provider and region name collision",
+    config: {
+      proxies: [safetyProxy("US-local")],
+      "proxy-providers": { US: { type: "inline", payload: [safetyProxy("US-remote")] } },
+      "proxy-groups": [{ name: "US", type: "select", use: ["US"] }],
+      rules: ["DOMAIN,example.test,US", "MATCH,DIRECT"]
+    },
+    verify(output) {
+      assert.deepStrictEqual(groupByName(output, "AI").proxies, ["US Group"]);
+      assert.deepStrictEqual(groupByName(output, "US Group").use, ["US"]);
+      assert.deepStrictEqual(groupByName(output, "US Group").proxies, ["US-local"]);
+      assert(output.rules.includes("DOMAIN,example.test,US Group"));
+    }
+  },
+  {
+    name: "P1 provider restrictions with unsafe inherited options",
+    config: {
+      "proxy-providers": { airport: { type: "inline", payload: [safetyProxy("US-A"), safetyProxy("TW-A"), safetyProxy("SG-A"), safetyProxy("HK-A"), safetyProxy("US HK ambiguous"), safetyProxy("US Traffic 100GB")] } },
+      "proxy-groups": [
+        { name: "US", type: "url-test", use: ["airport"], filter: "US|HK", proxies: ["DIRECT"], "empty-fallback": "DIRECT", "include-all": true },
+        { name: "TW", type: "select", use: ["airport"] },
+        { name: "SG", type: "select", use: ["airport"] }
+      ],
+      rules: ["MATCH,DIRECT"]
+    },
+    verify(output) {
+      for (const region of ["US", "TW", "SG"]) {
+        const group = groupByName(output, region);
+        assert.deepStrictEqual(group.proxies, [], "P1: no inherited groups or DIRECT in provider region groups");
+        assert.deepStrictEqual(group.use, ["airport"]);
+        assert.strictEqual(group.type, "select");
+        assert.strictEqual(group["include-all"], undefined);
+        assert.strictEqual(group["empty-fallback"], "REJECT", "P1: an empty provider filter must never become COMPATIBLE/DIRECT");
+        const matches = group.filter.replace(/^\(\?i\)/, "");
+        const excludes = group["exclude-filter"].replace(/^\(\?i\)/, "");
+        const names = output["proxy-providers"].airport.payload.filter(p => new RegExp(matches, "i").test(p.name) && !new RegExp(excludes, "i").test(p.name)).map(p => p.name);
+        assert.deepStrictEqual(names, [region + "-A"], "P1: provider filter must only admit eligible region nodes");
+      }
+    }
+  }
+];
+for (const testCase of safetyCases) {
+  testCase.verify(run(testCase.config));
+}
+
 if (process.env.MIHOMO_BIN) {
   const httpProxy = (name, port, extra = {}) => ({
     name,
@@ -793,7 +944,7 @@ if (process.env.MIHOMO_BIN) {
   assert(mergeRules.length > 100, "Merge.yaml must keep providing the routing rule set");
   const mergeProviders = mergeProviderStubs(mergeRules);
 
-  const mihomoCases = [
+  const mihomoCases = [...safetyCases,
     {
       name: "dialer-proxy compact dependency",
       config: {
@@ -866,6 +1017,12 @@ if (process.env.MIHOMO_BIN) {
   ];
 
   for (const testCase of mihomoCases) {
+    if (testCase.verify) {
+      const inputResult = childProcess.spawnSync(path.resolve(process.env.MIHOMO_BIN), [
+        "-t", "-config", Buffer.from(JSON.stringify(testCase.config), "utf8").toString("base64")
+      ], { encoding: "utf8" });
+      assert.strictEqual(inputResult.status, 0, `${testCase.name} must start with a valid subscription:\n${inputResult.stdout}${inputResult.stderr}`);
+    }
     const output = run(testCase.config);
     const encoded = Buffer.from(JSON.stringify(output), "utf8").toString("base64");
     const mihomoBin = path.resolve(process.env.MIHOMO_BIN);
@@ -1003,3 +1160,94 @@ if (process.env.MIHOMO_BIN) {
 }
 
 console.log("Script.js regression tests passed");
+
+// A parser check cannot prove how provider filters behave after an update. Use a
+// private core, loopback-only API, local file provider and no enabled proxy ports.
+async function testProviderRuntime() {
+  const work = fs.mkdtempSync(path.join(os.tmpdir(), "clash-safety-test-"));
+  let core;
+  let closed;
+  let logs = "";
+  const pause = ms => new Promise(resolve => setTimeout(resolve, ms));
+  try {
+    const fixture = safetyCases.find(item => item.name === "P1 provider restrictions with unsafe inherited options");
+    const config = run(fixture.config);
+    const providerFile = path.join(work, "airport.json");
+    const writeProvider = proxies => fs.writeFileSync(providerFile, JSON.stringify({ proxies }));
+    writeProvider(fixture.config["proxy-providers"].airport.payload.concat([{ name: "US Direct", type: "direct" }]));
+    config["proxy-providers"].airport = { type: "file", path: providerFile, "health-check": { enable: false } };
+    Object.assign(config, {
+      "external-controller": "127.0.0.1:0", "log-level": "info",
+      dns: { enable: false }, tun: { enable: false },
+      profile: { "store-selected": false, "store-fake-ip": false }
+    });
+    core = childProcess.spawn(path.resolve(process.env.MIHOMO_BIN), [
+      "-d", work, "-config", Buffer.from(JSON.stringify(config)).toString("base64")
+    ]);
+    closed = new Promise(resolve => core.once("close", resolve));
+    core.stdout.on("data", data => { logs += data; });
+    core.stderr.on("data", data => { logs += data; });
+    core.on("error", error => { logs += error.message; });
+
+    let address;
+    for (let attempt = 0; attempt < 200; attempt++) {
+      const match = /RESTful API listening at: (127\.0\.0\.1:\d+)/.exec(logs);
+      if (match) { address = match[1]; break; }
+      if (core.exitCode !== null || /External controller listen error/.test(logs)) break;
+      await pause(50);
+    }
+    assert(address, `isolated test core must expose its loopback API:\n${logs}`);
+    function request(endpoint, method = "GET") {
+      return new Promise((resolve, reject) => {
+        const req = http.request(`http://${address}${endpoint}`, { method, timeout: 3000 }, res => {
+          let body = "";
+          res.setEncoding("utf8");
+          res.on("data", data => { body += data; });
+          res.on("end", () => {
+            if (res.statusCode >= 300) return reject(new Error(`${res.statusCode}: ${body}`));
+            try { resolve(body ? JSON.parse(body) : null); } catch (error) { reject(error); }
+          });
+        });
+        req.on("timeout", () => req.destroy(new Error("test API timed out")));
+        req.on("error", reject);
+        req.end();
+      });
+    }
+    let state;
+    for (let attempt = 0; attempt < 100; attempt++) {
+      state = await request("/proxies");
+      if (state.proxies.US && state.proxies.US.all.includes("US-A")) break;
+      await pause(50);
+    }
+    for (const region of ["US", "TW", "SG"]) {
+      assert.deepStrictEqual(state.proxies[region].all, [region + "-A"], "P1: actual core must exclude other regions, info nodes and direct proxies");
+      assert.strictEqual(state.proxies[region].now, region + "-A");
+    }
+    writeProvider([safetyProxy("HK-A"), safetyProxy("US Traffic 100GB"), safetyProxy("US HK ambiguous")]);
+    await request("/providers/proxies/airport", "PUT");
+    state = await request("/proxies");
+    for (const region of ["US", "TW", "SG"]) {
+      assert.deepStrictEqual(state.proxies[region].all, ["REJECT"], "P1: provider losing the selected region must fail closed");
+      assert.strictEqual(state.proxies[region].now, "REJECT");
+    }
+    writeProvider([safetyProxy("US-B"), safetyProxy("TW-B"), safetyProxy("SG-B")]);
+    await request("/providers/proxies/airport", "PUT");
+    state = await request("/proxies");
+    for (const region of ["US", "TW", "SG"]) {
+      assert.deepStrictEqual(state.proxies[region].all, [region + "-B"], "eligible nodes must return after provider recovery");
+    }
+    console.log("Mihomo provider runtime tests passed: initial / empty / recovered");
+  } finally {
+    if (core && core.pid) {
+      core.kill("SIGTERM");
+      const forceKill = setTimeout(() => core.kill("SIGKILL"), 3000);
+      await closed;
+      clearTimeout(forceKill);
+    }
+    fs.rmSync(work, { recursive: true, force: true });
+  }
+}
+
+if (process.env.MIHOMO_BIN) {
+  testProviderRuntime().catch(error => { console.error(error); process.exitCode = 1; });
+}

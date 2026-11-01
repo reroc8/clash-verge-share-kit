@@ -51,7 +51,11 @@
 
 交易所注意：
 
-`AI` 和 `Exchange` 都只是分流隔离，不代表可绕过平台地区限制。国际 AI（含 Claude / Codex）只保留 `US`，`Exchange` 只保留 `TW / SG`，都不混入其它地区、DIRECT 或 Proxies；没有对应地区节点时使用 `REJECT`，避免直连泄露或误用其它地区。没有可识别的 US 节点时，`AI` 只保留 `REJECT`，国际 AI 需要补充 US 节点后才能使用。DeepSeek、Kimi、豆包、通义、文心、腾讯元宝、智谱、MiniMax 等中国大陆 AI 明确走 `DIRECT`。未知站点最终兜底为 `DIRECT`，避免国内小站误走代理。
+`AI` 和 `Exchange` 都只是分流隔离，不代表可绕过平台地区限制。国际 AI（含 Claude / Codex）只保留 `US`，`Exchange` 只保留 `TW / SG`。这三个地区组会重新筛选节点，不沿用订阅同名组中的嵌套组、DIRECT 或 Proxies，且统一为手动选择，不继承自动测速切换。没有对应地区节点时使用 `REJECT`，不直连兜底；`US` 始终存在但为空时也只含 `REJECT`，直接指向 US 的 Lexmount、mail.com 等规则同样会被拒绝。
+
+对于动态 provider，三个地区组直接引用 provider 并在内核中按节点名称过滤；更新时仍执行相同过滤。`empty-fallback: REJECT` 用于阻止筛空后的默认 `COMPATIBLE` 回退（见 [Mihomo 代理组字段](https://wiki.metacubex.one/config/proxy-groups/#empty-fallback)）。因此没有美国节点时，纯内联订阅的 `AI` 显示 `REJECT`；provider 订阅可能显示 `AI → US → REJECT`。原订阅的非受管组仍保留给普通流量使用，不作为 AI/Exchange 的地区证明。
+
+识别依据仍是节点标签，不是出口 IP 检测。含多个已识别地区的名称（如 `US HK`）会被保守排除；只有 `US` 组名、节点却叫 `Node 01` 的订阅也不会被推定为美国，需按已核实的出口地区修正节点名。无法保证标签真实、供应商不改变出口，或平台不触发风控。DeepSeek、Kimi、豆包、通义、文心、腾讯元宝、智谱、MiniMax 等中国大陆 AI 明确走 `DIRECT`。未知站点最终兜底为 `DIRECT`，避免国内小站误走代理。
 
 钉钉防偷跑：
 
@@ -120,23 +124,24 @@ WorkBuddy AI 国际版的遥测端点 `sg.tgalileo.com` 解析到腾讯云新加
 - DOMAIN-SUFFIX,982xj.xyz,Google + YouTube + Telegram
 ```
 
-  目标写 `Google + YouTube + Telegram` 组而非具体地区组：该组由 `Script.js` 保证存在、默认台湾出口；地区组在订阅缺对应节点时会被降级到 `Proxies`，统一业务组不会。
+  目标写 `Google + YouTube + Telegram` 组而非具体地区组：该组由 `Script.js` 保证存在、默认台湾出口，不依赖订阅是否恰好生成了某个地区组。
 
 位次要求：以上规则必须排在 `global-domain`、`tld-proxy`、`cn-domain` 之前。Muse 的进程规则若落到 `global-domain` 之后，`graph.facebook.com` 会先被判给 `Proxies`（默认台湾出口，Muse 不可用）；`muse.ai` 同理会被 `tld-proxy` 抢走。`tests/test-script.js` 对这八条规则都有位次断言。
 
-取舍：这些是**把某个服务固定到某地区组**，组内节点仍由用户选择。若订阅里没有对应地区的节点，`Script.js` 生成的组会自动过滤，最差回落到 `Proxies`——那时该服务的地区要求可能不满足，属于数据前提不足，不是规则失效。
+取舍：这些是**把某个服务固定到某地区组**，组内节点仍由用户选择。只有规则的地区目标组本身不存在时，才沿用兼容逻辑改指 `Proxies`，此时不保证地区要求；已生成的受限 `US / TW / SG` 组如果筛空，则使用 `REJECT`。`AI / Exchange` 不使用上述缺组降级逻辑，始终拒绝不具备合格地区节点的连接。
 
 兼容策略：
 - 安装脚本不再要求订阅必须有固定策略组名。
 - 安装脚本会同步 `profiles.yaml` 中已有订阅绑定的 merge/script 文件，避免当前订阅继续使用旧脚本。
 - `Script.js` 会自动补齐 `Proxies / AI / US / Google + YouTube + Telegram / Exchange`；旧订阅里的 `Google`、`YouTube`、`Telegram` 组会隐藏并指向统一组，旧规则目标会自动改写。
 - 顶层节点键优先使用标准小写 `proxies`；小写键缺失时兼容 `Proxies / PROXIES` 等大小写变体，并统一规范化为小写。
-- 纯内联节点订阅会压缩原始策略组；存在 `proxy-providers` 的纯 provider 或混合订阅会保留原始 provider 组，避免节点入口丢失。
+- 纯内联节点订阅会压缩原始策略组；存在 `proxy-providers` 的纯 provider 或混合订阅会保留非受管 provider 组。`US / TW / SG` 由受限过滤重新建立；与节点或 provider 重名时使用 `US Group` 等备用名，避免名称冲突。
 - 纯内联节点订阅如果仍有规则、子规则、规则集下载、`dialer-proxy`、监听器、隧道或 NTP 引用自定义组，会自动关闭压缩并保留全部原始组，避免生成悬空引用。
+- 删除提示节点时同步清理保留组的成员；残留规则目标、监听器等引用改为 `REJECT`，空组也拒绝连接。兼容别名建立后检查完整依赖链，只移除 `Proxies` 与统一 Google 组中造成循环的选项，保留其他自定义入口。
 - 订阅原有的 `REJECT` 规则和 reject rule-provider 会保留；基础包自身不注入广告拦截规则。
 - 远程规则集显式通过 `Proxies` 下载，降低新机器首次启动时直连 GitHub Raw 失败的概率。
 - `AI` 组会被强制更新为仅包含 `US`，用于统一 Claude / Codex / OpenAI 等国际 AI 的出口地区；中国大陆 AI 不进入该组。旧订阅里的 `Claude` 组会保留为隐藏兼容别名。
 - `Exchange` 组会被强制更新为仅包含 `TW / SG`，用于降低交易所登录出口地区变化。
 - 能识别地区节点时，自动生成 `HK / JP / SG / TW / US / UK`。
 - 代理页核心组会重新排序为业务组、地区组、普通代理兜底，不保留订阅原始组的混排顺序。
-- 识别不到地区时，降级到 `Proxies` 或 `DIRECT`，优先保证配置能启动。
+- 普通海外流量保留 `Proxies` / `DIRECT` 兼容兜底；`AI / Exchange` 缺合格地区节点时拒绝连接，不扩大到其它地区或直连。

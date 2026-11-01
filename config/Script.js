@@ -129,15 +129,19 @@ function main(config, profileName) {
     return !!proxyNameByLower[normalizeName(name)];
   }
 
+  function groupNameIsReserved(name) {
+    return proxyNameExists(name) || hasOwn(config["proxy-providers"] || {}, name);
+  }
+
   function allocateGroupName(preferredName) {
-    if (!proxyNameExists(preferredName) && !findExistingGroup(preferredName)) {
+    if (!groupNameIsReserved(preferredName) && !findExistingGroup(preferredName)) {
       return preferredName;
     }
 
     var baseName = preferredName + " Group";
     var candidate = baseName;
     var suffix = 2;
-    while (proxyNameExists(candidate) || findExistingGroup(candidate)) {
+    while (groupNameIsReserved(candidate) || findExistingGroup(candidate)) {
       candidate = baseName + " " + suffix;
       suffix += 1;
     }
@@ -151,7 +155,7 @@ function main(config, profileName) {
     }
 
     var existingGroup = findGroup(preferredName);
-    if (existingGroup && !proxyNameExists(existingGroup.name)) {
+    if (existingGroup && !groupNameIsReserved(existingGroup.name)) {
       managedGroupNameByPreferred[preferredName] = existingGroup.name;
       return existingGroup;
     }
@@ -160,11 +164,11 @@ function main(config, profileName) {
     for (var suffix = 1; suffix < 100; suffix++) {
       var candidate = suffix === 1 ? baseName : baseName + " " + suffix;
       var fallbackGroup = findGroup(candidate);
-      if (fallbackGroup && !proxyNameExists(fallbackGroup.name)) {
+      if (fallbackGroup && !groupNameIsReserved(fallbackGroup.name)) {
         managedGroupNameByPreferred[preferredName] = fallbackGroup.name;
         return fallbackGroup;
       }
-      if (!fallbackGroup && !proxyNameExists(candidate)) {
+      if (!fallbackGroup && !groupNameIsReserved(candidate)) {
         break;
       }
     }
@@ -215,6 +219,8 @@ function main(config, profileName) {
         "include-all",
         "include-all-proxies",
         "include-all-providers",
+        "default-selected",
+        "empty-fallback",
         "url",
         "interval",
         "timeout",
@@ -261,10 +267,14 @@ function main(config, profileName) {
 
   var originalProxies = [];
   var skippedInfoNodes = [];
+  var removedProxyNames = createNameMap();
   for (var pr = 0; pr < proxies.length; pr++) {
     var candidateName = proxies[pr].name;
     if (optionMatches(candidateName, infoNodePatterns)) {
       skippedInfoNodes.push(candidateName);
+      removedProxyNames[candidateName] = true;
+      delete proxyNames[candidateName];
+      delete proxyNameByLower[normalizeName(candidateName)];
       continue;
     }
     originalProxies.push(candidateName);
@@ -272,19 +282,76 @@ function main(config, profileName) {
   if (skippedInfoNodes.length > 0) {
     // 必须真的从配置里删掉，不能只是"不建组" —— 那样它们仍会出现在客户端的节点列表里，
     // 用户照样能选到，问题一点没解决。（这个坑踩过：日志说跳过了，实际一个没少。）
-    config.proxies = proxies.filter(function (proxy) {
-      return !optionMatches(proxy.name, infoNodePatterns);
+    proxies = proxies.filter(function (proxy) {
+      return !removedProxyNames[proxy.name];
     });
+    config.proxies = proxies;
+    // 保留组名供订阅规则引用，但不能留下已删除节点；空组拒绝而不是直连。
+    for (var infoGroupIndex = 0; infoGroupIndex < groups.length; infoGroupIndex++) {
+      var infoGroup = groups[infoGroupIndex];
+      if (Array.isArray(infoGroup.proxies)) {
+        var retainedOptions = infoGroup.proxies.filter(function (name) {
+          return !removedProxyNames[name];
+        });
+        if (retainedOptions.length !== infoGroup.proxies.length) {
+          infoGroup.proxies = retainedOptions;
+          infoGroup["empty-fallback"] = "REJECT";
+          if (retainedOptions.length === 0 && !(infoGroup.use && infoGroup.use.length) &&
+              !infoGroup["include-all"] && !infoGroup["include-all-proxies"] && !infoGroup["include-all-providers"]) {
+            infoGroup.proxies = ["REJECT"];
+          }
+        }
+      }
+      redirectRemovedProxy(infoGroup, "default-selected");
+      redirectRemovedProxy(infoGroup, "empty-fallback");
+    }
+    for (var remainingProxyIndex = 0; remainingProxyIndex < proxies.length; remainingProxyIndex++) {
+      redirectRemovedProxy(proxies[remainingProxyIndex], "dialer-proxy");
+    }
+    var proxyReferenceLists = [config.listeners, config.tunnels];
+    for (var referenceListIndex = 0; referenceListIndex < proxyReferenceLists.length; referenceListIndex++) {
+      var referenceList = proxyReferenceLists[referenceListIndex];
+      if (Array.isArray(referenceList)) {
+        for (var referenceIndex = 0; referenceIndex < referenceList.length; referenceIndex++) {
+          redirectRemovedProxy(referenceList[referenceIndex], "proxy");
+        }
+      }
+    }
+    redirectRemovedProxy(config.ntp, "proxy");
+    var providerMaps = [ruleProviders, config["proxy-providers"]];
+    for (var providerMapIndex = 0; providerMapIndex < providerMaps.length; providerMapIndex++) {
+      var providerMap = providerMaps[providerMapIndex];
+      for (var infoProviderName in providerMap) {
+        if (hasOwn(providerMap, infoProviderName)) {
+          var infoProvider = providerMap[infoProviderName];
+          redirectRemovedProxy(infoProvider, "proxy");
+          if (infoProvider) {
+            redirectRemovedProxy(infoProvider.override, "dialer-proxy");
+            if (Array.isArray(infoProvider.payload)) {
+              for (var payloadIndex = 0; payloadIndex < infoProvider.payload.length; payloadIndex++) {
+                redirectRemovedProxy(infoProvider.payload[payloadIndex], "dialer-proxy");
+              }
+            }
+          }
+        }
+      }
+    }
     console.log("[clash-verge-share-kit] 已剔除 " + skippedInfoNodes.length +
       " 个提示类节点（不是真实落地，选中会导致出口漂移）: " + skippedInfoNodes.join(" / "));
   }
+  function redirectRemovedProxy(object, key) {
+    if (object && removedProxyNames[object[key]]) {
+      object[key] = "REJECT";
+    }
+  }
   var proxyProviders = config["proxy-providers"];
   var hasProxyProviders = false;
+  var proxyProviderNames = [];
   if (proxyProviders && typeof proxyProviders === "object") {
     for (var providerName in proxyProviders) {
       if (hasOwn(proxyProviders, providerName)) {
         hasProxyProviders = true;
-        break;
+        proxyProviderNames.push(providerName);
       }
     }
   }
@@ -483,10 +550,58 @@ function main(config, profileName) {
   var detectedRegions = createNameMap();
 
   var regionOrder = ["HK", "JP", "SG", "TW", "US", "UK"];
+  var restrictedRegions = { US: true, TW: true, SG: true };
+
+  function excludedRegionPatterns(region) {
+    var patterns = infoNodePatterns.slice();
+    for (var regionIndex = 0; regionIndex < regionOrder.length; regionIndex++) {
+      if (regionOrder[regionIndex] !== region) {
+        patterns = patterns.concat(regionPatterns[regionOrder[regionIndex]]);
+      }
+    }
+    return patterns;
+  }
+
+  function mihomoFilter(patterns) {
+    var sources = [];
+    for (var patternIndex = 0; patternIndex < patterns.length; patternIndex++) {
+      sources.push("(?:" + patterns[patternIndex].source + ")");
+    }
+    return "(?i)" + sources.join("|");
+  }
+
   for (var ro = 0; ro < regionOrder.length; ro++) {
     var region = regionOrder[ro];
     var regionOptions = [];
     var patterns = regionPatterns[region];
+
+    if (restrictedRegions[region]) {
+      // 地区名不是证明：重建为真实节点，不继承原组中的嵌套组、DIRECT 或自动切换。
+      var excludedPatterns = excludedRegionPatterns(region);
+      for (var restrictedProxyIndex = 0; restrictedProxyIndex < proxies.length; restrictedProxyIndex++) {
+        var restrictedProxy = proxies[restrictedProxyIndex];
+        if (optionMatches(restrictedProxy.name, patterns) &&
+            !optionMatches(restrictedProxy.name, excludedPatterns) &&
+            !/^(direct|compatible|pass|dns|reject|reject-drop)$/i.test(restrictedProxy.type || "")) {
+          regionOptions.push(restrictedProxy.name);
+        }
+      }
+      detectedRegions[region] = regionOptions.length > 0 || hasProxyProviders;
+      if (detectedRegions[region] || findManagedGroup(region) || region === "US") {
+        managedGroups[region] = ensureManagedGroup(region, regionOptions, ["REJECT"]);
+        var restrictedGroup = findGroupByExactName(managedGroups[region]);
+        restrictedGroup["empty-fallback"] = "REJECT";
+        if (hasProxyProviders) {
+          // provider 更新后也在内核侧重新过滤；空结果必须拒绝，不能隐式变成 COMPATIBLE。
+          restrictedGroup.proxies = regionOptions;
+          restrictedGroup.use = proxyProviderNames.slice();
+          restrictedGroup.filter = mihomoFilter(patterns);
+          restrictedGroup["exclude-filter"] = mihomoFilter(excludedPatterns);
+          restrictedGroup["exclude-type"] = "Direct|Compatible|Pass|Dns|Reject|RejectDrop";
+        }
+      }
+      continue;
+    }
 
     if (!compactGroupsEnabled) {
       for (var og = 0; og < originalGroups.length; og++) {
@@ -512,9 +627,6 @@ function main(config, profileName) {
     }
   }
 
-  if (!managedGroups.US) {
-    managedGroups.US = ensureManagedGroup("US", [PROXIES_GROUP, "DIRECT"], ["DIRECT"]);
-  }
   // 业务组统一采用「地区优先」：第一个选项是明确的地区组，Proxies（兜底组）降到最后。
   // Claude 与 Codex / OpenAI 统一使用一个 AI 组，出口固定为 US。这样用户只需维护一个
   // 国际 AI 出口，避免两个组被误选成不同地区，导致同一账号的会话出口拆分。
@@ -560,7 +672,7 @@ function main(config, profileName) {
     managedGroups.HK,
     managedGroups.JP,
     managedGroups.SG,
-    managedGroups.US,
+    detectedRegions.US ? managedGroups.US : null,
     PROXIES_GROUP,
     "DIRECT"
   ], ["DIRECT"]);
@@ -602,31 +714,45 @@ function main(config, profileName) {
   managedGroups.Google = managedGroups.GoogleYouTubeTelegram;
   managedGroups.YouTube = managedGroups.GoogleYouTubeTelegram;
   managedGroups.Telegram = managedGroups.GoogleYouTubeTelegram;
-  managedGroups.Exchange = ensureManagedGroup("Exchange", [managedGroups.TW, managedGroups.SG], ["REJECT"]);
+  managedGroups.Exchange = ensureManagedGroup("Exchange", [
+    detectedRegions.TW ? managedGroups.TW : null,
+    detectedRegions.SG ? managedGroups.SG : null
+  ], ["REJECT"]);
 
-  // Proxies 可能是在统一业务组建立前由原始组名生成的；旧别名再指向统一组、
-  // 统一组又指向 Proxies 时会形成 mihomo 环。移除会回到 Proxies 的受管组边，
-  // 保留别名自身指向统一组的兼容语义。
-  var generatedProxiesGroup = findGroup(PROXIES_GROUP);
-  if (generatedProxiesGroup && Array.isArray(generatedProxiesGroup.proxies)) {
-    var proxyGroupCycleNames = createNameMap();
-    proxyGroupCycleNames[normalizeName(managedGroups.GoogleYouTubeTelegram)] = true;
-    var proxyGroupCycleAliases = ["Claude", "Google", "YouTube", "Telegram"];
-    for (var cycleAliasIndex = 0; cycleAliasIndex < proxyGroupCycleAliases.length; cycleAliasIndex++) {
-      var cycleAliasGroup = findGroup(proxyGroupCycleAliases[cycleAliasIndex]);
-      if (cycleAliasGroup) {
-        proxyGroupCycleNames[normalizeName(cycleAliasGroup.name)] = true;
+  // 别名改写完成后检查整条依赖链。只剪掉两个新汇总入口的回边，保留原自定义组与别名。
+  function reachesGroup(start, target) {
+    var pending = [start];
+    var visited = createNameMap();
+    while (pending.length > 0) {
+      var name = pending.pop();
+      if (name === target) {
+        return true;
+      }
+      if (visited[name]) {
+        continue;
+      }
+      visited[name] = true;
+      var group = findGroupByExactName(name);
+      if (group && Array.isArray(group.proxies)) {
+        pending = pending.concat(group.proxies);
       }
     }
-    var safeProxyOptions = [];
-    for (var proxyOptionIndex = 0; proxyOptionIndex < generatedProxiesGroup.proxies.length; proxyOptionIndex++) {
-      var proxyOption = generatedProxiesGroup.proxies[proxyOptionIndex];
-      if (!proxyGroupCycleNames[normalizeName(proxyOption)]) {
-        safeProxyOptions.push(proxyOption);
-      }
-    }
-    generatedProxiesGroup.proxies = safeProxyOptions.length > 0 ? unique(safeProxyOptions) : ["DIRECT"];
+    return false;
   }
+
+  function removeGroupBackEdges(name) {
+    var group = findGroupByExactName(name);
+    if (group && Array.isArray(group.proxies)) {
+      var safeOptions = group.proxies.filter(function (option) {
+        return !reachesGroup(option, name);
+      });
+      if (safeOptions.length !== group.proxies.length) {
+        group.proxies = safeOptions.length > 0 ? unique(safeOptions) : ["DIRECT"];
+      }
+    }
+  }
+  removeGroupBackEdges(PROXIES_GROUP);
+  removeGroupBackEdges(managedGroups.GoogleYouTubeTelegram);
 
   var managedTargetMap = createNameMap();
   for (var managedName in managedGroups) {
@@ -789,6 +915,10 @@ function main(config, profileName) {
     }
     var targetIndex = ruleType === "MATCH" ? 1 : 2;
     if (parts.length > targetIndex) {
+      if (removedProxyNames[parts[targetIndex]]) {
+        parts[targetIndex] = "REJECT";
+        return parts.join(",");
+      }
       var mappedTarget = lookupName(managedTargetMap, parts[targetIndex]);
       if (mappedTarget !== undefined) {
         parts[targetIndex] = mappedTarget;
