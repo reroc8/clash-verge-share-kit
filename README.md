@@ -80,7 +80,7 @@
 ```text
 config/    Merge.yaml · Script.js · verge.yaml · dns_config.yaml
 install/   macOS · Windows 安装脚本与「关闭进程」脚本
-scripts/   构建 · 敏感扫描 · 流量监控（clash-monitor.sh）
+scripts/   构建 · 敏感扫描 · 流量监控（clash-monitor.sh + monitor-traffic.py）
 tests/     回归测试
 docs/      路由设计文档
 monitor/   clash-monitor.sh 输出的流量日志目录（不进 Release 包）

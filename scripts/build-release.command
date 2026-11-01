@@ -111,6 +111,7 @@ bash -n "$ROOT_DIR/scripts/check-sensitive.sh"
 bash -n "$ROOT_DIR/scripts/clash-monitor.sh"
 bash -n "$ROOT_DIR/tests/test-installers.sh"
 bash "$ROOT_DIR/tests/test-installers.sh"
+bash "$ROOT_DIR/tests/test-monitor.sh"
 
 POWERSHELL_BIN=""
 if command -v pwsh >/dev/null 2>&1; then

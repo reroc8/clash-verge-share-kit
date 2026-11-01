@@ -1,6 +1,6 @@
 #!/bin/bash
 # ─────────────────────────────────────────────────────────────
-# Clash Verge 连接监控：按进程聚合实时上传/下载流量
+# Clash Verge 连接监控：按连接 ID 计量，再按进程与代理/直连/未知聚合
 # 通过内核 Unix socket 抓取，无需开启外部控制器 TCP 端口
 #
 # 用法:
@@ -12,8 +12,10 @@
 #   CLASH_SOCK=/path/to.sock ./clash-monitor.sh
 #
 # 输出:
-#   <脚本目录>/../monitor/clash-traffic.log   CSV: 时间,进程,上传增量MB,下载增量MB,连接数
+#   <脚本目录>/../monitor/clash-traffic-v2.log   CSV: 时间,进程,上传增量MB,下载增量MB,连接数,路径类型
 #   终端实时打印每轮增量排行；每 30 秒打印一次本次会话累计 Top10
+#   只计采样观察到的字节；采样间关闭的连接可能漏计，不等于机场账单。
+#   需与同目录 monitor-traffic.py 一起使用。
 # ─────────────────────────────────────────────────────────────
 set -euo pipefail
 
@@ -24,12 +26,17 @@ case "$DURATION" in
     exit 2
     ;;
 esac
-LOGDIR="$(cd "$(dirname "$0")/.." && pwd)/monitor"
-LOGFILE="${2:-$LOGDIR/clash-traffic.log}"
-mkdir -p "$LOGDIR"
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+LOGDIR="$(cd "$SCRIPT_DIR/.." && pwd)/monitor"
+LOGFILE="${2:-$LOGDIR/clash-traffic-v2.log}"
+mkdir -p "$(dirname "$LOGFILE")"
 
 if ! command -v python3 >/dev/null 2>&1; then
-  echo "错误: 需要 python3 来聚合连接数据（macOS 自带；缺失可用 brew install python 安装）" >&2
+  echo "错误: 需要 python3 来聚合连接数据（缺失可用 brew install python 安装）" >&2
+  exit 1
+fi
+if [ ! -f "$SCRIPT_DIR/monitor-traffic.py" ]; then
+  echo "错误: 缺少同目录的 monitor-traffic.py，请保留完整 scripts 目录" >&2
   exit 1
 fi
 
@@ -80,14 +87,16 @@ detect_sock() {
 TMPROOT="${TMPDIR:-/tmp}"
 STATE_DIR="${TMPROOT%/}/clash-monitor-$(id -u)-$$"
 mkdir -p "$STATE_DIR"
-STATE_FILE="$STATE_DIR/state.tsv"        # 上一轮每个进程的连接累计快照
-TOTAL_FILE="$STATE_DIR/session.tsv"      # 本次会话累计增量
+STATE_FILE="$STATE_DIR/state.json"       # 上一轮每个连接 ID 的字节计数
+TOTAL_FILE="$STATE_DIR/session.json"     # 本次观测累计字节数，按进程和路径分类
 SNAP_FILE="$STATE_DIR/connections.json"  # 最近一次接口响应
+PROXIES_FILE="$STATE_DIR/proxies.json"
+PROVIDERS_FILE="$STATE_DIR/providers.json"
 ERR_FILE="$STATE_DIR/last-error.txt"
 cleanup() { rm -rf "$STATE_DIR"; }
 trap cleanup EXIT
 
-fetch() { curl -s -f -m 5 --unix-socket "$SOCK" http://localhost/connections; }
+fetch() { curl -s -f -m 5 --unix-socket "$SOCK" "http://localhost/$1"; }
 
 SAMPLE_ERR=""
 
@@ -99,84 +108,23 @@ sample() {
   # 响应先落盘再交给 python 读文件：整个 JSON 不能作为命令行参数传入——
   # 连接数上千时响应会超过系统 ARG_MAX（约 1MB），报 Argument list too long，
   # 而且 stderr 一丢，用户只会看到「内核未运行」这种误导性提示。
-  if ! fetch > "$SNAP_FILE"; then
+  if ! fetch connections > "$SNAP_FILE"; then
     SAMPLE_ERR="请求内核接口失败"
     return 1
   fi
-  if ! python3 - "$SNAP_FILE" "$STATE_FILE" "$TOTAL_FILE" "$LOGFILE" "$ts" \
-      > "$STATE_DIR/round.out" 2> "$ERR_FILE" <<'PYEOF'
-import json, os, sys
-
-snap_path, state_path, total_path, log_path, ts = sys.argv[1:6]
-MB = 1048576.0
-
-with open(snap_path, 'rb') as handle:
-    data = json.load(handle)
-
-agg = {}
-for conn in data.get('connections') or []:
-    meta = conn.get('metadata') or {}
-    proc = (meta.get('processPath') or meta.get('process') or 'unknown').split('/')[-1]
-    item = agg.setdefault(proc, [0, 0, 0])
-    item[0] += conn.get('upload', 0) or 0
-    item[1] += conn.get('download', 0) or 0
-    item[2] += 1
-
-first_sample = not os.path.exists(state_path)
-before = {}
-if not first_sample:
-    with open(state_path) as handle:
-        for line in handle:
-            name, up, down, count = line.rstrip('\n').split('\t')
-            before[name] = [int(up), int(down), int(count)]
-
-with open(state_path, 'w') as handle:
-    for name, (up, down, count) in agg.items():
-        handle.write(f"{name}\t{up}\t{down}\t{count}\n")
-
-if first_sample:
-    top = sorted(agg.items(), key=lambda kv: -(kv[1][0] + kv[1][1]))[:8]
-    print(f"── {ts} 基线（连接累计总量） ──")
-    for name, (up, down, count) in top:
-        print(f"  {name:<28} ↑{up/MB:9.2f}MB ↓{down/MB:9.2f}MB  ({count}连接)")
-    sys.exit(0)
-
-session = {}
-if os.path.exists(total_path):
-    with open(total_path) as handle:
-        for line in handle:
-            name, up, down = line.rstrip('\n').split('\t')
-            session[name] = [float(up), float(down)]
-
-rows = []
-with open(log_path, 'a') as log:
-    for name, (up, down, count) in agg.items():
-        if name not in before:
-            # 本轮新出现的进程没有上一轮基线：它的连接累计总量不是这一轮的增量，
-            # 跳过本轮，从下一轮开始按新基线计算。
-            continue
-        base_up, base_down, _ = before[name]
-        # 连接关闭后内核的累计值会回退，这是计数重置而不是负流量：按 0 处理。
-        delta_up = max(0, up - base_up) / MB
-        delta_down = max(0, down - base_down) / MB
-        if delta_up <= 0.001 and delta_down <= 0.001:
-            continue
-        log.write(f"{ts},{name},{delta_up:.3f},{delta_down:.3f},{count}\n")
-        rows.append((name, delta_up, delta_down, count))
-        acc = session.setdefault(name, [0.0, 0.0])
-        acc[0] += delta_up
-        acc[1] += delta_down
-
-with open(total_path, 'w') as handle:
-    for name, (up, down) in session.items():
-        handle.write(f"{name}\t{up:.3f}\t{down:.3f}\n")
-
-rows.sort(key=lambda row: -(row[1] + row[2]))
-if rows:
-    print(f"── {ts} ──")
-    for name, up, down, count in rows[:8]:
-        print(f"  {name:<28} ↑{up:+8.2f}MB ↓{down:+8.2f}MB  ({count}连接)")
-PYEOF
+  # 名称不是类型：自定义直连节点和 provider 节点都需要从 API 查实际类型。
+  # 元数据缺失时继续采样，但归入 unknown，不能猜成代理流量。
+  if ! fetch proxies > "$PROXIES_FILE"; then
+    printf '{}\n' > "$PROXIES_FILE"
+    echo "[$(date '+%H:%M:%S')] 无法读取节点类型，部分连接将标为未知" >&2
+  fi
+  if ! fetch providers/proxies > "$PROVIDERS_FILE"; then
+    printf '{}\n' > "$PROVIDERS_FILE"
+    echo "[$(date '+%H:%M:%S')] 无法读取 provider 节点类型，部分连接将标为未知" >&2
+  fi
+  if ! python3 "$SCRIPT_DIR/monitor-traffic.py" sample \
+      "$SNAP_FILE" "$STATE_FILE" "$TOTAL_FILE" "$LOGFILE" "$ts" "$PROXIES_FILE" "$PROVIDERS_FILE" \
+      > "$STATE_DIR/round.out" 2> "$ERR_FILE"
   then
     SAMPLE_ERR="解析内核响应失败（$(tail -n 1 "$ERR_FILE" 2>/dev/null | cut -c1-160)）"
     return 1
@@ -188,28 +136,19 @@ PYEOF
 }
 
 report_session() {
-  python3 - "$TOTAL_FILE" <<'PYEOF'
-import sys
-rows = []
-try:
-    with open(sys.argv[1]) as handle:
-        for line in handle:
-            name, up, down = line.rstrip('\n').split('\t')
-            rows.append((name, float(up), float(down)))
-except FileNotFoundError:
-    sys.exit(0)
-if not rows:
-    sys.exit(0)
-rows.sort(key=lambda row: -(row[1] + row[2]))
-print("════ 本次会话累计 Top10（自启动起） ════")
-for name, up, down in rows[:10]:
-    print(f"  {name:<28} ↑{up:9.2f}MB ↓{down:9.2f}MB")
-PYEOF
+  python3 "$SCRIPT_DIR/monitor-traffic.py" report "$TOTAL_FILE"
 }
 
-# CSV 表头只写一次（日志文件为空时）
-if [ ! -s "$LOGFILE" ]; then
-  echo "timestamp,process,upload_delta_mb,download_delta_mb,connections" > "$LOGFILE"
+# 不能把六列的新数据接在五列旧日志后面；旧文件保留不动。
+LOG_HEADER="timestamp,process,upload_delta_mb,download_delta_mb,connections,route"
+if [ -s "$LOGFILE" ]; then
+  IFS= read -r EXISTING_HEADER < "$LOGFILE" || true
+  if [ "${EXISTING_HEADER%$'\r'}" != "$LOG_HEADER" ]; then
+    echo "错误: 日志格式不同，请指定新的日志文件；原日志未修改: $LOGFILE" >&2
+    exit 2
+  fi
+else
+  printf '%s\n' "$LOG_HEADER" > "$LOGFILE"
 fi
 if detect_sock; then
   echo "[监控启动] socket=$SOCK  日志=$LOGFILE  (Ctrl+C 停止)"
@@ -252,6 +191,7 @@ while true; do
 
   ELAPSED=$((NOW - START))
   if [ "$DURATION" != "0" ] && [ "$ELAPSED" -ge "$DURATION" ]; then
+    report_session || true
     echo "[监控结束] 已运行 ${ELAPSED} 秒（${ITER} 轮），日志: $LOGFILE"
     exit 0
   fi

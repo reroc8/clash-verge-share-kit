@@ -789,6 +789,31 @@ function groupByName(config, name) {
 const safetyProxy = (name, extra = {}) => ({
   name, type: "http", server: "127.0.0.1", port: 18080, ...extra
 });
+const mappingCases = ["lowercase", "node-collision", "provider-collision"].map(kind => {
+  const lowerName = unifiedGoogleGroup.toLowerCase();
+  const actualName = kind === "lowercase" ? lowerName : unifiedGoogleGroup + " Group";
+  const config = {
+    proxies: [safetyProxy("US-A"), safetyProxy("TW-A")],
+    "proxy-groups": kind === "lowercase" ? [{ name: lowerName, type: "select", proxies: ["TW-A"] }] : [],
+    rules: [`DOMAIN,google.example,${unifiedGoogleGroup}`, "MATCH,DIRECT"],
+    "sub-rules": { custom: [`AND,((DOMAIN,sub.test),(NETWORK,TCP)),${unifiedGoogleGroup.toUpperCase()}`] },
+    "rule-providers": { custom: { type: "inline", behavior: "domain", payload: [], proxy: unifiedGoogleGroup } }
+  };
+  if (kind === "node-collision") config.proxies.push(safetyProxy(unifiedGoogleGroup));
+  if (kind === "provider-collision") config["proxy-providers"] = { [unifiedGoogleGroup]: { type: "inline", payload: [safetyProxy("US-provider")] } };
+  return {
+    name: `P2 unified group mapping: ${kind}`, config,
+    check(output) {
+      assert(groupByName(output, actualName));
+      assert(output.rules.includes(`DOMAIN,google.example,${actualName}`), "P2: canonical group name must map to the actual group, not a same-named node");
+      assert.strictEqual(output["rule-providers"].custom.proxy, actualName);
+      assert.deepStrictEqual(output["sub-rules"].custom, [`AND,((DOMAIN,sub.test),(NETWORK,TCP)),${actualName}`]);
+      assert.strictEqual(output["proxy-groups"].filter(group => group.name === actualName).length, 1);
+    }
+  };
+});
+for (const testCase of mappingCases) testCase.check(run(testCase.config));
+
 const safetyCases = [
   {
     name: "P1 transitive alias cycle",
@@ -944,7 +969,14 @@ if (process.env.MIHOMO_BIN) {
   assert(mergeRules.length > 100, "Merge.yaml must keep providing the routing rule set");
   const mergeProviders = mergeProviderStubs(mergeRules);
 
-  const mihomoCases = [...safetyCases,
+  const mihomoCases = [...safetyCases, ...mappingCases.map(testCase => ({
+    name: testCase.name + " with actual Merge.yaml",
+    config: {
+      ...testCase.config,
+      "rule-providers": { ...mergeProviders, ...testCase.config["rule-providers"] },
+      rules: mergeRules.concat(testCase.config.rules)
+    }
+  })),
     {
       name: "dialer-proxy compact dependency",
       config: {

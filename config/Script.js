@@ -760,6 +760,7 @@ function main(config, profileName) {
       managedTargetMap[managedName] = managedGroups[managedName];
     }
   }
+  managedTargetMap[unifiedGoogleMediaGroup] = managedGroups.GoogleYouTubeTelegram;
 
   if (ruleProviders && typeof ruleProviders === "object") {
     for (var ruleProviderName in ruleProviders) {

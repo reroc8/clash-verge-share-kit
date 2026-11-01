@@ -16,6 +16,10 @@ export FAKE_A="$WORK/a.json"
 export FAKE_B="$WORK/b.json"
 export FAKE_C="$WORK/c.json"
 export FAKE_REST=""
+export FAKE_PROXIES="$WORK/proxies.json"
+export FAKE_PROVIDERS="$WORK/providers.json"
+printf '%s\n' '{"proxies":{"US-A":{"type":"Http"}}}' > "$FAKE_PROXIES"
+printf '%s\n' '{"providers":{}}' > "$FAKE_PROVIDERS"
 : > "$FAKE_COUNTER"
 
 # A：大响应（> 1MB，超过 argv 长度上限），基线
@@ -32,6 +36,8 @@ def write(path, upload, download, bump_first=0):
     conns = []
     for i in range(1800):
         conns.append({
+            "id": str(i),
+            "chains": ["US-A", "AI"],
             "upload": upload + i,
             "download": download + i,
             "metadata": {
@@ -57,6 +63,10 @@ fi
 mkdir -p "$WORK/bin-curl" "$WORK/bin-fast"
 cat > "$WORK/bin-curl/curl" <<'FAKE'
 #!/usr/bin/env sh
+case "$*" in
+  *http://localhost/providers/proxies*) cat "$FAKE_PROVIDERS"; exit 0 ;;
+  *http://localhost/proxies*) cat "$FAKE_PROXIES"; exit 0 ;;
+esac
 n=0
 [ -f "$FAKE_COUNTER" ] && n=$(cat "$FAKE_COUNTER")
 n=$((n + 1))
@@ -103,7 +113,7 @@ if grep -Eq '^[^,]+,[^,]+,(-[0-9]|-[0-9]+\.[0-9])' "$WORK/run1.log"; then
     cat "$WORK/run1.log"
     exit 1
 fi
-if ! grep -Fq ',Alpha,5.000,0.000,' "$WORK/run1.log"; then
+if ! grep -Fq ',Alpha,5.000000,0.000000,1800,proxy' "$WORK/run1.log"; then
     echo "monitor: expected the 5MB upload delta row"
     cat "$WORK/run1.log"
     exit 1
@@ -161,4 +171,49 @@ if [ "$RUN3_ELAPSED" -lt 2 ]; then
     exit 1
 fi
 
+# ── 场景 4：旧连接关闭不能抵消同进程另一条连接的新增流量 ──
+python3 - "$WORK/rollover-a.json" "$WORK/rollover-b.json" <<'PY'
+import json, sys
+MB = 1048576
+def conn(ident, mb):
+    return {"id": ident, "upload": mb * MB, "download": 0,
+            "chains": ["US-A", "AI"], "metadata": {"process": "Alpha"}}
+for path, rows in zip(sys.argv[1:], [[conn("closed", 100), conn("alive", 0)], [conn("alive", 20)]]):
+    with open(path, "w") as handle:
+        json.dump({"connections": rows}, handle)
+PY
+mkdir -p "$WORK/tmp4"
+: > "$FAKE_COUNTER"
+PATH="$WORK/bin-fast:$PATH" FAKE_A="$WORK/rollover-a.json" FAKE_REST="$WORK/rollover-b.json" \
+    CLASH_SOCK="$WORK/fake.sock" TMPDIR="$WORK/tmp4" \
+    bash "$ROOT_DIR/scripts/clash-monitor.sh" 2 "$WORK/run4.log" > "$WORK/run4.out" 2>&1
+if ! grep -Fq ',Alpha,20.' "$WORK/run4.log"; then
+    echo "monitor: closed 100MB connection must not cancel a surviving connection's 20MB increment"
+    cat "$WORK/run4.log"
+    exit 1
+fi
+
+# ── 场景 5：不能向旧版五列日志追加新版六列数据 ──
+printf '%s\n' 'timestamp,process,upload_delta_mb,download_delta_mb,connections' > "$WORK/legacy.log"
+cp "$WORK/legacy.log" "$WORK/legacy-before.log"
+LEGACY_EXIT=0
+PATH="$WORK/bin-fast:$PATH" CLASH_SOCK="$WORK/fake.sock" \
+    bash "$ROOT_DIR/scripts/clash-monitor.sh" 1 "$WORK/legacy.log" > "$WORK/legacy.out" 2>&1 || LEGACY_EXIT=$?
+if [ "$LEGACY_EXIT" -ne 2 ] || ! cmp -s "$WORK/legacy.log" "$WORK/legacy-before.log"; then
+    echo "monitor: old-format log must be rejected without modification"
+    exit 1
+fi
+grep -Fq '日志格式不同' "$WORK/legacy.out"
+
+# 只拷贝 shell 启动器时要立即失败，不得循环重试并最终报成功。
+cp "$ROOT_DIR/scripts/clash-monitor.sh" "$WORK/standalone.sh"
+MISSING_EXIT=0
+bash "$WORK/standalone.sh" 1 "$WORK/missing.log" > "$WORK/missing.out" 2>&1 || MISSING_EXIT=$?
+if [ "$MISSING_EXIT" -ne 1 ] || [ -e "$WORK/missing.log" ]; then
+    echo "monitor: missing accounting module must fail before sampling"
+    exit 1
+fi
+grep -Fq '缺少同目录的 monitor-traffic.py' "$WORK/missing.out"
+
+python3 -B "$ROOT_DIR/tests/test-monitor-traffic.py"
 echo "Monitor script regression tests passed"

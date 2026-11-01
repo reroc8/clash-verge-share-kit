@@ -67,7 +67,11 @@
 
 该规则按进程名匹配（大小写不敏感），覆盖主进程 `DingTalk` 与会议子进程 `DingMeeting` 等全家桶。规则置于私网直连之后、所有业务精确域名规则之前，因此**无条件生效**：钉钉进程的任何连接都会被强制直连，不受后面 AI/Google 精确域名规则或规则集影响。已知的边缘取舍是钉钉内置浏览器打开 AI 等需代理站点时同样走直连（无法加载），对 IM 场景可接受。钉钉自己的域名直连规则保留在原位置，服务于浏览器等非钉钉进程访问钉钉站点。`MATCH,DIRECT` 兜底保证其余国内应用（网盘、远程桌面等）只有命中代理规则集时才走代理，无需逐个加进程规则。修改 Merge.yaml 后需重新激活订阅（或重启内核）才生效。
 
-验证工具：`scripts/clash-monitor.sh` 通过内核 Unix socket（无需开启外部控制器 TCP 端口）按进程聚合实时上传/下载流量，日志输出到 `monitor/clash-traffic.log`，可用于复查某应用是否仍在消耗代理流量。
+验证工具：`scripts/clash-monitor.sh` 与同目录 `monitor-traffic.py` 配合，通过内核 Unix socket（无需开启外部控制器 TCP 端口）按连接 ID 计算增量，再按进程和路径分类汇总。首次采样只建立基线，不把启动前的历史累计量算进本次；之后出现的新连接计入已观察到的累计字节，存活连接按自身计数差值计算，旧连接关闭不再抵消其他连接的增量。
+
+新日志默认写 `monitor/clash-traffic-v2.log`，CSV 六列为 `timestamp,process,upload_delta_mb,download_delta_mb,connections,route`，其中 MB 按 1048576 字节换算。`route` 分为 `proxy`（代理）、`direct`（直连）、`unknown`（未知），终端也分别显示；同进程的三类流量不会混算。路径根据连接实际出站节点和 API 返回的类型判断，不按策略组名称猜测；provider 节点按 provider 名与节点名共同定位。类型元数据缺失或不认识时保留未知，不能当作已证实的代理流量。可用它复查某应用的**已观测连接**是否走代理。
+
+边界：轮询只能看到当时仍存活的连接，采样间开始并结束的短连接、已关闭连接最后一段字节可能漏计；`unknown` 也不代表直连。因此观测累计不是完整流量审计，更不是机场计费账单。原 `clash-traffic.log` 保留不动；若手动指定已有五列旧日志，脚本会拒绝追加并提示换新文件，避免格式混写。只拷贝启动器不够，应保留完整 `scripts/` 目录。
 
 接口地址由脚本自动探测，**不再写死**：Clash Verge Rev 2.5.4 起 macOS 上分两种形态——服务模式为 `/var/run/clash-verge-service/users/<uid>/verge-mihomo.sock`，用户模式（Sidecar）为 `$TMPDIR/verge-mihomo.sock`；只有 2.5.4 之前的旧版本才是固定的 `/tmp/verge/verge-mihomo.sock`。也可用 `CLASH_SOCK=/路径` 手动指定。注意 `clash-verge.yaml` 里的 `external-controller-unix` 在服务模式下写的仍是用户模式地址，不能当作当前实际在用的地址。
 
@@ -134,6 +138,7 @@ WorkBuddy AI 国际版的遥测端点 `sg.tgalileo.com` 解析到腾讯云新加
 - 安装脚本不再要求订阅必须有固定策略组名。
 - 安装脚本会同步 `profiles.yaml` 中已有订阅绑定的 merge/script 文件，避免当前订阅继续使用旧脚本。
 - `Script.js` 会自动补齐 `Proxies / AI / US / Google + YouTube + Telegram / Exchange`；旧订阅里的 `Google`、`YouTube`、`Telegram` 组会隐藏并指向统一组，旧规则目标会自动改写。
+- 统一 Google 组的完整名称也参与大小写不敏感映射；复用小写组名，或因节点/provider 重名分配备用组名时，主规则、子规则和规则集下载目标均使用实际组名。
 - 顶层节点键优先使用标准小写 `proxies`；小写键缺失时兼容 `Proxies / PROXIES` 等大小写变体，并统一规范化为小写。
 - 纯内联节点订阅会压缩原始策略组；存在 `proxy-providers` 的纯 provider 或混合订阅会保留非受管 provider 组。`US / TW / SG` 由受限过滤重新建立；与节点或 provider 重名时使用 `US Group` 等备用名，避免名称冲突。
 - 纯内联节点订阅如果仍有规则、子规则、规则集下载、`dialer-proxy`、监听器、隧道或 NTP 引用自定义组，会自动关闭压缩并保留全部原始组，避免生成悬空引用。
