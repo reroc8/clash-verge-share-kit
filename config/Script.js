@@ -370,6 +370,131 @@ function main(config, profileName) {
     tw: true,
     us: true
   };
+  // 下载出口属于订阅的启动依赖，不能跟随业务/地区组改写。只复制会受影响的
+  // 分组路径，保留顺序、默认选择及动态来源；多个 provider 共享副本。
+  // 普通节点若以这些组作为 dialer，也保留其原传输路径，不复制/混入新的地区节点。
+  function preserveProviderDownloadRoutes() {
+    if (!hasProxyProviders) {
+      return;
+    }
+    var mutableGroups = createNameMap();
+    var preferredNames = Object.keys(managedPreferredGroupNames).concat(["UK"]);
+    for (var preferredIndex = 0; preferredIndex < preferredNames.length; preferredIndex++) {
+      var originalManagedGroup = findManagedGroup(preferredNames[preferredIndex]);
+      if (originalManagedGroup) {
+        mutableGroups[originalManagedGroup.name] = true;
+      }
+    }
+    var downloadCopies = createNameMap();
+
+    function nodeByName(name) {
+      for (var nodeIndex = 0; nodeIndex < proxies.length; nodeIndex++) {
+        if (proxies[nodeIndex].name === name) {
+          return proxies[nodeIndex];
+        }
+      }
+      return null;
+    }
+
+    function transportReferences(group) {
+      var references = [];
+      if (group["include-all"] || group["include-all-proxies"]) {
+        references = references.concat(proxies);
+      }
+      var sources = group["include-all"] || group["include-all-providers"] ?
+        proxyProviderNames : (group.use || []);
+      for (var sourceIndex = 0; sourceIndex < sources.length; sourceIndex++) {
+        var source = proxyProviders[sources[sourceIndex]];
+        if (source) {
+          if (source.override) {
+            references.push(source.override);
+          }
+          if (Array.isArray(source.payload)) {
+            references = references.concat(source.payload);
+          }
+        }
+      }
+      return references;
+    }
+
+    function routeChanges(name, visited) {
+      if (!name || visited[name]) {
+        return false;
+      }
+      visited[name] = true;
+      if (mutableGroups[name]) {
+        return true;
+      }
+      var group = findGroupByExactName(name);
+      if (group) {
+        var options = (group.proxies || []).concat([group["default-selected"], group["empty-fallback"]]);
+        var references = transportReferences(group);
+        for (var referenceIndex = 0; referenceIndex < references.length; referenceIndex++) {
+          options.push(references[referenceIndex]["dialer-proxy"]);
+        }
+        for (var optionIndex = 0; optionIndex < options.length; optionIndex++) {
+          if (routeChanges(options[optionIndex], visited)) {
+            return true;
+          }
+        }
+      } else {
+        var node = nodeByName(name);
+        if (node) {
+          return routeChanges(node["dialer-proxy"], visited);
+        }
+      }
+      return false;
+    }
+
+    function preserveRoute(name) {
+      if (downloadCopies[name]) {
+        return downloadCopies[name];
+      }
+      if (!routeChanges(name, createNameMap())) {
+        return name;
+      }
+      var original = findGroupByExactName(name);
+      if (!original) {
+        var node = nodeByName(name);
+        // 节点自身不改名，避免破坏原组的 filter/default-selected。
+        downloadCopies[name] = name;
+        node["dialer-proxy"] = preserveRoute(node["dialer-proxy"]);
+        return name;
+      }
+      var copy = JSON.parse(JSON.stringify(original));
+      copy.name = allocateGroupName("Provider Download");
+      copy.hidden = true;
+      downloadCopies[name] = copy.name;
+      groups.push(copy);
+      rememberGroupName(copy.name);
+      if (Array.isArray(copy.proxies)) {
+        copy.proxies = copy.proxies.map(preserveRoute);
+      }
+      if (copy["default-selected"]) {
+        copy["default-selected"] = preserveRoute(copy["default-selected"]);
+      }
+      if (copy["empty-fallback"]) {
+        copy["empty-fallback"] = preserveRoute(copy["empty-fallback"]);
+      }
+      var references = transportReferences(copy);
+      for (var referenceIndex = 0; referenceIndex < references.length; referenceIndex++) {
+        var reference = references[referenceIndex];
+        if (reference["dialer-proxy"]) {
+          reference["dialer-proxy"] = preserveRoute(reference["dialer-proxy"]);
+        }
+      }
+      return copy.name;
+    }
+
+    for (var downloadIndex = 0; downloadIndex < proxyProviderNames.length; downloadIndex++) {
+      var provider = proxyProviders[proxyProviderNames[downloadIndex]];
+      if (provider && provider.proxy) {
+        provider.proxy = preserveRoute(provider.proxy);
+      }
+    }
+  }
+  preserveProviderDownloadRoutes();
+
   var originalCustomGroupNames = createNameMap();
   for (var originalGroupIndex = 0; originalGroupIndex < originalGroups.length; originalGroupIndex++) {
     var originalGroupName = originalGroups[originalGroupIndex];

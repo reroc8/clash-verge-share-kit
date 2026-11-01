@@ -294,6 +294,117 @@ grep -Fqx 'old default merge' "$RUN3_CLASH/profiles/Merge.yaml" || { echo "auto-
 test -z "$(find "$RUN3_CLASH" -maxdepth 1 -type d -name 'backup_*' -print)" || { echo "auto-quit failure: no backup must be taken"; exit 1; }
 echo "auto-quit failure (GUI survives): installer aborts without touching files"
 
+# 安装器的进程阶段单独运行：不改 HOME、不写真实配置，pgrep/pkill/sleep 全部用替身。
+# 从源码提取整个阶段（含检测、TERM/KILL 和最终判断），避免只测一个复制出来的函数。
+PROCESS_TEST_DIR="$TMP_HOME/process-selection"
+mkdir -p "$PROCESS_TEST_DIR/bin"
+PROCESS_TEST_SCRIPT="$PROCESS_TEST_DIR/process-stage.sh"
+{
+    printf '%s\n' '#!/usr/bin/env bash' 'set -euo pipefail'
+    awk '
+        /^CLASH_GUI_PATTERN=/ { emit = 1 }
+        /^mkdir -p "\$CLASH_DIR\/profiles"$/ { exit }
+        emit { print }
+    ' "$ROOT_DIR/install/install-macos.command"
+} > "$PROCESS_TEST_SCRIPT"
+grep -Fq 'terminate_clash_processes' "$PROCESS_TEST_SCRIPT"
+FAKE_PROCESS_TABLE="$PROCESS_TEST_DIR/processes.txt"
+FAKE_PROCESS_LOG="$PROCESS_TEST_DIR/killed.txt"
+export FAKE_PROCESS_TABLE FAKE_PROCESS_LOG
+cat > "$PROCESS_TEST_DIR/bin/pgrep" <<'FAKE'
+#!/usr/bin/env bash
+set -u
+action="${0##*/}"
+owner=""; pattern=""; signal=TERM; exact=0
+while [ "$#" -gt 0 ]; do
+    case "$1" in
+        -u) owner="$2"; shift ;;
+        -i) shopt -s nocasematch ;;
+        -x) exact=1 ;;
+        -TERM|-KILL) signal="${1#-}" ;;
+        -*) exit 2 ;;
+        *) pattern="$1" ;;
+    esac
+    shift
+done
+[ "$exact" -eq 0 ] || pattern="^($pattern)$"
+status=1
+[ "$action" != pkill ] || : > "$FAKE_PROCESS_TABLE.next"
+while IFS='|' read -r pid uid name resistance; do
+    keep=1
+    if { [ -z "$owner" ] || [ "$uid" = "$owner" ]; } && [[ "$name" =~ $pattern ]]; then
+        status=0
+        if [ "$action" = pgrep ]; then
+            echo "$pid"
+        else
+            printf '%s|%s|%s\n' "$signal" "$pid" "$name" >> "$FAKE_PROCESS_LOG"
+            if [ "$resistance" != protected ] && { [ "$resistance" != kill ] || [ "$signal" = KILL ]; }; then
+                keep=0
+            fi
+        fi
+    fi
+    if [ "$action" = pkill ] && [ "$keep" -eq 1 ]; then
+        printf '%s|%s|%s|%s\n' "$pid" "$uid" "$name" "$resistance" >> "$FAKE_PROCESS_TABLE.next"
+    fi
+done < "$FAKE_PROCESS_TABLE"
+[ "$action" != pkill ] || mv "$FAKE_PROCESS_TABLE.next" "$FAKE_PROCESS_TABLE"
+exit "$status"
+FAKE
+cp "$PROCESS_TEST_DIR/bin/pgrep" "$PROCESS_TEST_DIR/bin/pkill"
+printf '%s\n' '#!/usr/bin/env sh' 'exit 0' > "$PROCESS_TEST_DIR/bin/sleep"
+chmod +x "$PROCESS_TEST_DIR/bin/pgrep" "$PROCESS_TEST_DIR/bin/pkill" "$PROCESS_TEST_DIR/bin/sleep"
+printf '%s\n' \
+    "6001|$(id -u)|mihomo-party|" \
+    "6002|$(id -u)|test-mihomo-helper|" \
+    "6003|$(id -u)|verge-mihomo-alpha-helper|" \
+    '6004|0|clash-verge-service|protected' \
+    > "$PROCESS_TEST_DIR/unrelated.txt"
+
+# 只有其他客户端和 root 助手时，不应报告内核在跑，也不应发出任何结束请求。
+cp "$PROCESS_TEST_DIR/unrelated.txt" "$FAKE_PROCESS_TABLE"
+: > "$FAKE_PROCESS_LOG"
+PATH="$PROCESS_TEST_DIR/bin:$PATH" bash "$PROCESS_TEST_SCRIPT" > "$PROCESS_TEST_DIR/unrelated.log" 2>&1
+if grep -Eq '正在尝试清退|内核仍在运行' "$PROCESS_TEST_DIR/unrelated.log" || [ -s "$FAKE_PROCESS_LOG" ]; then
+    echo "unrelated clients: installer must not detect or kill another mihomo client"
+    cat "$PROCESS_TEST_DIR/unrelated.log" "$FAKE_PROCESS_LOG"
+    exit 1
+fi
+cmp -s "$PROCESS_TEST_DIR/unrelated.txt" "$FAKE_PROCESS_TABLE"
+echo "unrelated clients: neither detected nor killed"
+
+# 三个受支持内核与其他客户端同时存在，TERM 无效后仅对这些内核升级为 KILL。
+printf '%s\n' \
+    "6101|$(id -u)|verge-mihomo|kill" \
+    "6102|$(id -u)|verge-mihomo-alpha|kill" \
+    "6103|$(id -u)|mihomo|kill" \
+    >> "$FAKE_PROCESS_TABLE"
+: > "$FAKE_PROCESS_LOG"
+PATH="$PROCESS_TEST_DIR/bin:$PATH" bash "$PROCESS_TEST_SCRIPT" > "$PROCESS_TEST_DIR/kernels.log" 2>&1
+if ! cmp -s "$PROCESS_TEST_DIR/unrelated.txt" "$FAKE_PROCESS_TABLE"; then
+    echo "kernel cleanup: all known kernels must stop and unrelated clients must survive"
+    cat "$FAKE_PROCESS_TABLE" "$FAKE_PROCESS_LOG"
+    exit 1
+fi
+for expected in '6101|verge-mihomo' '6102|verge-mihomo-alpha' '6103|mihomo'; do
+    grep -Fqx "TERM|$expected" "$FAKE_PROCESS_LOG"
+    grep -Fqx "KILL|$expected" "$FAKE_PROCESS_LOG"
+done
+test "$(wc -l < "$FAKE_PROCESS_LOG" | tr -d ' ')" -eq 6
+echo "known kernels: TERM and KILL preserve other clients"
+
+# root 内核无法结束时仍只警告，不中止安装，也不触碰其他客户端。
+printf '%s\n' '6201|0|verge-mihomo|protected' >> "$FAKE_PROCESS_TABLE"
+cp "$FAKE_PROCESS_TABLE" "$PROCESS_TEST_DIR/protected.txt"
+: > "$FAKE_PROCESS_LOG"
+PATH="$PROCESS_TEST_DIR/bin:$PATH" bash "$PROCESS_TEST_SCRIPT" > "$PROCESS_TEST_DIR/protected.log" 2>&1
+grep -Fq '内核仍在运行' "$PROCESS_TEST_DIR/protected.log"
+grep -Fq '这不影响安装' "$PROCESS_TEST_DIR/protected.log"
+grep -Fqx 'TERM|6201|verge-mihomo' "$FAKE_PROCESS_LOG"
+grep -Fqx 'KILL|6201|verge-mihomo' "$FAKE_PROCESS_LOG"
+test "$(wc -l < "$FAKE_PROCESS_LOG" | tr -d ' ')" -eq 2
+cmp -s "$PROCESS_TEST_DIR/protected.txt" "$FAKE_PROCESS_TABLE"
+echo "protected root kernel: warns without blocking installation"
+
 # --- 独立的「关闭 Clash」脚本 ---
 CLOSE_SCRIPT="$ROOT_DIR/install/close-clash-macos.command"
 

@@ -2,6 +2,7 @@ const assert = require("assert");
 const childProcess = require("child_process");
 const fs = require("fs");
 const http = require("http");
+const net = require("net");
 const os = require("os");
 const path = require("path");
 const vm = require("vm");
@@ -957,6 +958,95 @@ for (const testCase of safetyCases) {
   testCase.verify(run(testCase.config));
 }
 
+// Download groups are transport dependencies, not business-routing choices.
+const downloadCases = ["direct", "indirect", "collision", "dialer", "dynamic", "region", "provider-override", "provider-payload"].map(kind => {
+  const config = {
+    proxies: [safetyProxy("US-static")],
+    "proxy-providers": {
+      airport: { type: "inline", payload: [safetyProxy("TW-remote")], proxy: "Google" }
+    },
+    "proxy-groups": [{ name: "Google", type: "select", proxies: ["DIRECT", "US-static"], "default-selected": "DIRECT" }],
+    rules: ["MATCH,DIRECT"]
+  };
+  if (kind === "indirect") {
+    config["proxy-groups"].push(
+      { name: "Download Root", type: "select", proxies: ["Download Middle", "DIRECT"], "default-selected": "Download Middle" },
+      { name: "Download Middle", type: "select", proxies: ["Google"] }
+    );
+    config["proxy-providers"].airport.proxy = "Download Root";
+    config["proxy-providers"].second = { ...config["proxy-providers"].airport };
+  }
+  if (kind === "collision") {
+    config["proxy-groups"].push({ name: "Provider Download", type: "select", proxies: ["DIRECT"] });
+    config.proxies.push(safetyProxy("Provider Download Group"));
+    config["proxy-providers"]["Provider Download Group 2"] = { type: "inline", payload: [safetyProxy("HK-remote")] };
+  }
+  if (kind === "dialer") {
+    config.proxies[0]["dialer-proxy"] = "Google";
+    config["proxy-groups"][0].proxies = ["DIRECT"];
+    config["proxy-providers"].airport.proxy = "US-static";
+  }
+  if (kind === "dynamic") {
+    config["proxy-providers"].bootstrap = { type: "inline", payload: [safetyProxy("TW-bootstrap")] };
+    Object.assign(config["proxy-groups"][0], { use: ["bootstrap"], filter: "TW|DIRECT", "exclude-filter": "HK", "empty-fallback": "REJECT" });
+  }
+  if (kind === "region") {
+    config["proxy-groups"][0].name = "TW";
+    config["proxy-providers"].airport.proxy = "TW";
+  }
+  if (kind === "provider-override" || kind === "provider-payload") {
+    config["proxy-providers"].bootstrap = { type: "inline", payload: [safetyProxy("TW-bootstrap")] };
+    const transport = kind === "provider-override" ?
+      (config["proxy-providers"].bootstrap.override = {}) : config["proxy-providers"].bootstrap.payload[0];
+    transport["dialer-proxy"] = "Google";
+    config["proxy-groups"].push({ name: "Bootstrap", type: "select", use: ["bootstrap"] });
+    config["proxy-providers"].airport.proxy = "Bootstrap";
+  }
+  return {
+    name: "P2 provider download preservation: " + kind, config,
+    verify(output) {
+      let target = output["proxy-providers"].airport.proxy;
+      if (kind === "dialer") {
+        assert.strictEqual(target, "US-static", "download node names must stay stable for filters and selections");
+        target = output.proxies.find(node => node.name === target)["dialer-proxy"];
+      }
+      const copiedRoot = groupByName(output, target);
+      assert(copiedRoot && copiedRoot.hidden, "provider download must use a hidden copy of its original route");
+      let copiedGoogle = copiedRoot;
+      if (kind === "indirect") {
+        assert.strictEqual(output["proxy-providers"].second.proxy, target, "providers sharing a route must share the same copy");
+        assert.deepStrictEqual(groupByName(output, "Download Root").proxies, ["Download Middle", "DIRECT"], "shared original groups must remain untouched");
+        assert.strictEqual(copiedRoot["default-selected"], copiedRoot.proxies[0], "default-selected must follow copied group names");
+        copiedGoogle = groupByName(output, groupByName(output, copiedRoot.proxies[0]).proxies[0]);
+      }
+      if (kind === "provider-override" || kind === "provider-payload") {
+        const bootstrap = output["proxy-providers"].bootstrap;
+        const transport = kind === "provider-override" ? bootstrap.override : bootstrap.payload[0];
+        copiedGoogle = groupByName(output, transport["dialer-proxy"]);
+        assert.deepStrictEqual(copiedRoot.use, ["bootstrap"], "keep the existing source while preserving its declared transport dependency");
+      }
+      const expectedGoogle = { ...config["proxy-groups"][0], name: copiedGoogle.name, hidden: true };
+      assert.deepStrictEqual(copiedGoogle, expectedGoogle, "preserve the original order, selection and dynamic source options");
+      if (kind === "collision") assert.strictEqual(target, "Provider Download Group 3", "download copy names must avoid groups, nodes and providers");
+      for (const name of ["AI", "Exchange", "US", "TW", "SG"]) {
+        assert(!groupByName(output, name).proxies.some(option => /^Provider Download/.test(option)), "business and region groups must not offer download copies");
+      }
+      assert.deepStrictEqual(run(output), output, "repeated transforms must neither duplicate copies nor change download semantics");
+    }
+  };
+});
+for (const testCase of downloadCases) testCase.verify(run(testCase.config));
+{
+  const config = {
+    "proxy-providers": { airport: { type: "inline", payload: [safetyProxy("TW-A")], proxy: "Custom Download" } },
+    "proxy-groups": [{ name: "Custom Download", type: "select", proxies: ["DIRECT"] }],
+    rules: ["MATCH,DIRECT"]
+  };
+  const output = run(config);
+  assert.strictEqual(output["proxy-providers"].airport.proxy, "Custom Download", "unaffected download routes need no copies");
+  assert(!output["proxy-groups"].some(group => /^Provider Download/.test(group.name)));
+}
+
 if (process.env.MIHOMO_BIN) {
   const httpProxy = (name, port, extra = {}) => ({
     name,
@@ -969,7 +1059,7 @@ if (process.env.MIHOMO_BIN) {
   assert(mergeRules.length > 100, "Merge.yaml must keep providing the routing rule set");
   const mergeProviders = mergeProviderStubs(mergeRules);
 
-  const mihomoCases = [...safetyCases, ...mappingCases.map(testCase => ({
+  const mihomoCases = [...downloadCases, ...safetyCases, ...mappingCases.map(testCase => ({
     name: testCase.name + " with actual Merge.yaml",
     config: {
       ...testCase.config,
@@ -1280,6 +1370,126 @@ async function testProviderRuntime() {
   }
 }
 
+// No credentials, external websites, TUN or existing CVR state: a cold cache and
+// a loopback HTTP server prove that a provider can actually bootstrap itself.
+async function testProviderDownloadRuntime() {
+  let fetches = 0;
+  const server = http.createServer((req, res) => {
+    fetches += 1;
+    res.end(JSON.stringify({ proxies: [safetyProxy("TW-downloaded")] }));
+  });
+  const sockets = new Set();
+  server.on("connect", (req, client, head) => {
+    // The mock proxy only tunnels back to this same test server.
+    if (req.url !== `127.0.0.1:${server.address().port}`) return client.destroy();
+    const upstream = net.connect(server.address().port, "127.0.0.1", () => {
+      client.write("HTTP/1.1 200 Connection Established\r\n\r\n");
+      if (head.length) upstream.write(head);
+      client.pipe(upstream).pipe(client);
+    });
+    for (const socket of [client, upstream]) {
+      sockets.add(socket);
+      socket.on("close", () => sockets.delete(socket));
+    }
+    client.on("error", () => upstream.destroy());
+    upstream.on("error", () => client.destroy());
+  });
+  await new Promise((resolve, reject) => {
+    server.once("error", reject);
+    server.listen(0, "127.0.0.1", resolve);
+  });
+  try {
+    for (const kind of ["direct", "indirect", "static-dialer", "provider-override", "provider-payload", "all-proxies", "all-providers"]) {
+      const work = fs.mkdtempSync(path.join(os.tmpdir(), "clash-download-test-"));
+      let core;
+      let closed;
+      let logs = "";
+      try {
+        const before = fetches;
+        const input = {
+          "proxy-providers": {
+            airport: { type: "http", url: `http://127.0.0.1:${server.address().port}/nodes`, path: "./airport.json", proxy: kind === "indirect" ? "Download Root" : "Google", interval: 3600 }
+          },
+          "proxy-groups": [
+            { name: "Proxies", type: "select", proxies: ["DIRECT"] },
+            { name: "Google", type: "select", proxies: ["DIRECT"] },
+            ...(kind === "indirect" ? [
+              { name: "Download Root", type: "select", proxies: ["Download Middle"] },
+              { name: "Download Middle", type: "select", proxies: ["Google"] }
+            ] : [])
+          ],
+          rules: ["MATCH,DIRECT"]
+        };
+        if (kind === "static-dialer" || kind === "all-proxies") {
+          input.proxies = [safetyProxy("Download transport", { port: server.address().port, "dialer-proxy": "Google" })];
+          input["proxy-providers"].airport.proxy = "Download transport";
+          if (kind === "all-proxies") {
+            input["proxy-groups"].push({ name: "Bootstrap", type: "select", "include-all-proxies": true });
+            input["proxy-providers"].airport.proxy = "Bootstrap";
+          }
+        }
+        if (kind === "provider-override" || kind === "provider-payload" || kind === "all-providers") {
+          const bootstrap = { type: "inline", payload: [safetyProxy("TW-bootstrap", { port: server.address().port })] };
+          const transport = kind !== "provider-payload" ? (bootstrap.override = {}) : bootstrap.payload[0];
+          transport["dialer-proxy"] = "Google";
+          input["proxy-providers"].bootstrap = bootstrap;
+          input["proxy-providers"].airport.proxy = "Bootstrap";
+          input["proxy-groups"].push(kind === "all-providers" ?
+            { name: "Bootstrap", type: "select", "include-all-providers": true, filter: "^TW-bootstrap$" } :
+            { name: "Bootstrap", type: "select", use: ["bootstrap"] });
+        }
+        const config = run(input);
+        Object.assign(config, {
+          "external-controller": "127.0.0.1:0", "log-level": "info",
+          dns: { enable: false }, tun: { enable: false },
+          profile: { "store-selected": false, "store-fake-ip": false }
+        });
+        core = childProcess.spawn(path.resolve(process.env.MIHOMO_BIN), ["-d", work, "-config", Buffer.from(JSON.stringify(config)).toString("base64")]);
+        closed = new Promise(resolve => core.once("close", resolve));
+        core.stdout.on("data", data => { logs += data; });
+        core.stderr.on("data", data => { logs += data; });
+        core.on("error", error => { logs += error.message; });
+        let state;
+        for (let attempt = 0; attempt < 100; attempt++) {
+          const match = /RESTful API listening at: (127\.0\.0\.1:\d+)/.exec(logs);
+          if (match) {
+            state = await new Promise((resolve, reject) => {
+              const req = http.get(`http://${match[1]}/proxies`, { timeout: 3000 }, res => {
+                let body = "";
+                res.on("data", data => { body += data; });
+                res.on("end", () => {
+                  try { resolve(JSON.parse(body)); } catch (error) { reject(error); }
+                });
+              });
+              req.on("timeout", () => req.destroy(new Error("download test API timed out")));
+              req.on("error", reject);
+            });
+            if (state.proxies.TW && state.proxies.TW.all.includes("TW-downloaded")) break;
+          }
+          if (core.exitCode !== null || /initial proxy provider airport error/.test(logs)) break;
+          await new Promise(resolve => setTimeout(resolve, 50));
+        }
+        assert(fetches > before, `cold HTTP provider must download through its preserved ${kind} route:\n${logs}`);
+        assert(state && state.proxies.TW.all.includes("TW-downloaded"), `downloaded nodes must reach the actual core:\n${logs}`);
+        assert.deepStrictEqual(state.proxies.US.all, ["REJECT"], "preserving downloads must not allow AI to use DIRECT or a non-US node");
+        assert.deepStrictEqual(state.proxies.Exchange.all, ["TW", "SG"], "Exchange must retain its restricted regions");
+      } finally {
+        if (core && core.pid) {
+          core.kill("SIGTERM");
+          const forceKill = setTimeout(() => core.kill("SIGKILL"), 3000);
+          await closed;
+          clearTimeout(forceKill);
+        }
+        fs.rmSync(work, { recursive: true, force: true });
+      }
+    }
+    console.log("Mihomo provider download tests passed: cold HTTP / indirect / static dialer / provider override+payload / include-all / fail-closed");
+  } finally {
+    for (const socket of sockets) socket.destroy();
+    await new Promise(resolve => server.close(resolve));
+  }
+}
+
 if (process.env.MIHOMO_BIN) {
-  testProviderRuntime().catch(error => { console.error(error); process.exitCode = 1; });
+  testProviderRuntime().then(testProviderDownloadRuntime).catch(error => { console.error(error); process.exitCode = 1; });
 }

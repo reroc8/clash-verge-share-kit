@@ -246,7 +246,8 @@ fi
 # 造成"已经退出 Clash 却仍被判定为在运行"（旧版就是这个行为）。GUI 判定必须带 -u。
 CLASH_GUI_PATTERN="clash-verge"
 CLASH_GUI_PATTERN_SPACED="clash verge"
-CLASH_KERNEL_PATTERN="mihomo"
+# 与独立关闭脚本一致，精确匹配内核名，避免误关 mihomo-party 等其他客户端。
+CLASH_KERNEL_NAMES="verge-mihomo verge-mihomo-alpha mihomo"
 
 clash_gui_pids() {
     pgrep -u "$(id -u)" -i "$CLASH_GUI_PATTERN" 2>/dev/null
@@ -254,19 +255,29 @@ clash_gui_pids() {
 }
 
 clash_kernel_pids() {
-    pgrep -i "$CLASH_KERNEL_PATTERN" 2>/dev/null
+    local name
+    for name in $CLASH_KERNEL_NAMES; do
+        pgrep -x "$name" 2>/dev/null || true
+    done
+}
+
+kill_clash_kernel() {
+    local signal="$1" name
+    for name in $CLASH_KERNEL_NAMES; do
+        pkill "-$signal" -x "$name" 2>/dev/null || true
+    done
 }
 
 terminate_clash_processes() {
     pkill -u "$(id -u)" -i "$CLASH_GUI_PATTERN" 2>/dev/null || true
     pkill -u "$(id -u)" -i "$CLASH_GUI_PATTERN_SPACED" 2>/dev/null || true
-    pkill -i "$CLASH_KERNEL_PATTERN" 2>/dev/null || true
+    kill_clash_kernel TERM
     sleep 1
     # 仍在的强杀
     if [ -n "$(clash_gui_pids)" ] || [ -n "$(clash_kernel_pids)" ]; then
         pkill -KILL -u "$(id -u)" -i "$CLASH_GUI_PATTERN" 2>/dev/null || true
         pkill -KILL -u "$(id -u)" -i "$CLASH_GUI_PATTERN_SPACED" 2>/dev/null || true
-        pkill -KILL -i "$CLASH_KERNEL_PATTERN" 2>/dev/null || true
+        kill_clash_kernel KILL
         sleep 1
     fi
 }
